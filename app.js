@@ -1,5 +1,5 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v5.9)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.1)
  */
 
 const wpConfig = {
@@ -13,10 +13,8 @@ const state = {
     posts: [] // Cache for details
 };
 
-// Logotipo Verificado directamente desde el servidor (v2026)
 const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
 
-// Icon mapping for categories
 const categoryIcons = {
     'gastronomia': 'fa-utensils',
     'alimentacion': 'fa-hamburger',
@@ -136,14 +134,25 @@ function renderView(view, container) {
         case 'taxi':
         case 'delivery':
             container.innerHTML = `
-                <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
+                <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500; display: flex; flex-direction: column;">
                     <button onclick="navigate('home')" style="position: absolute; top: 25px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-arrow-left"></i>
                     </button>
-                    <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 110px); border: none; position: absolute; top: -110px; left: 0;" 
-                            allow="geolocation">
-                    </iframe>
+                    
+                    <!-- Banners Publicitarios Superiores -->
+                    <div style="height: 150px; width: 100%; background: #000; overflow: hidden; position: relative; border-bottom: 2px solid var(--secondary-lilac);">
+                         <iframe src="https://goopiapp.com/publicidad/" 
+                                style="width: 100%; height: 500px; border: none; position: absolute; top: -110px; left: 0;">
+                         </iframe>
+                    </div>
+
+                    <!-- Mapa de Taxis/Delivery -->
+                    <div style="flex: 1; width: 100%; overflow: hidden; position: relative;">
+                        <iframe src="https://goopiapp.com/taxis-disponibles/" 
+                                style="width: 100%; height: calc(100% + 110px); border: none; position: absolute; top: -110px; left: 0;" 
+                                allow="geolocation">
+                        </iframe>
+                    </div>
                 </div>
             `;
             break;
