@@ -1,0 +1,23 @@
+{
+    "name": "Goopi App",
+    "short_name": "Goopi",
+    "description": "Donde todo sucede - Guía Comercial, Taxis y Delivery en Macas",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#05050a",
+    "theme_color": "#1a0b2e",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
