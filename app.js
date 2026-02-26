@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v20.0)
- * FIX: Diagnóstico de Firebase, Fallback de carga y UX de Auth crítica.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v22.0)
+ * FIX: Sincronización CDN global (Unpkg), Carga en Head y Estabilidad total.
  */
 
 const wpConfig = {
@@ -9,13 +9,12 @@ const wpConfig = {
     appPassword: "8wHv UbIC nUXg VogE DHcP VSYn"
 };
 
-// Firebase Safe-Initialization (v20.0)
+// Firebase Safe-Initialization (v22.0)
 let auth = null;
 let db = null;
 let firebaseError = false;
 
 function initFirebase() {
-    console.log("Iniciando Firebase Check...");
     if (typeof firebase !== 'undefined') {
         try {
             const firebaseConfig = {
@@ -33,21 +32,18 @@ function initFirebase() {
             auth = firebase.auth();
             db = firebase.database();
             auth.onAuthStateChanged((user) => {
-                console.log("Goopi Auth State:", user ? "User Logged In" : "No User");
-                if (user) {
-                    syncFavorites(user.uid);
-                } else {
-                    state.userFavorites = {};
-                }
+                console.log("Goopi Auth State:", user ? "Active Session" : "No Session");
+                if (user) syncFavorites(user.uid);
+                else state.userFavorites = {};
                 updateHeader();
             });
             firebaseError = false;
         } catch (e) {
-            console.error("Firebase Init Error:", e);
+            console.error("Firebase Error:", e);
             firebaseError = true;
         }
     } else {
-        console.error("Firebase SDK NO encontrado en el navegador.");
+        console.error("Firebase SDK missing from CDN.");
         firebaseError = true;
     }
 }
