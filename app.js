@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v7.0)
- * FIX: Banners 450x75px con anti-cache y corrección de visualización.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v8.2)
+ * FIX: Ocultar banner web en mapas, posición banner nativo y social login apps.
  */
 
 const wpConfig = {
@@ -14,13 +14,13 @@ const state = {
     posts: [] // Cache for details
 };
 
-const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
+const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?v=8.1";
 
-// URLs Directas de los Banners (Dimensiones 1200x200px)
+// URLs de Banners (Optimización Photon CDN para evitar bloqueos y caché)
 const adImages = [
-    "https://goopiapp.com/wp-content/uploads/2026/02/1.png?v=6.9",
-    "https://goopiapp.com/wp-content/uploads/2026/02/2.png?v=6.9",
-    "https://goopiapp.com/wp-content/uploads/2026/02/3.png?v=6.9"
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/1.png?w=1200",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/2.png?w=1200",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/3.png?w=1200"
 ];
 
 const categoryIcons = {
@@ -47,38 +47,35 @@ function getCategoryIcon(name) {
     return categoryIcons['default'];
 }
 
-// Generador de Carrusel Nativo - Dimensiones 450x75px (Relación 6:1)
-function generateNativeAdHtml(requestedHeight = "75px", idPrefix = "display") {
-    const uniqueId = `promo-img-${idPrefix}`;
-    const cacheBust = Date.now();
+// Generador de Banners con Proporción Exacta 6:1 (450x75px)
+function generateNativeAdHtml(heightIgnored = "", idPrefix = "slot") {
+    const uniqueId = `banner-img-${idPrefix}`;
+    const ts = Date.now();
 
-    // Script para rotar las imágenes localmente con mejor manejo de DOM
+    // Rotación de imágenes mejorada
     setTimeout(() => {
-        const startRotator = () => {
-            const img = document.getElementById(uniqueId);
-            if (img && !img.dataset.rotatorStarted) {
-                img.dataset.rotatorStarted = "true";
-                let currentIndex = 0;
-                setInterval(() => {
-                    currentIndex = (currentIndex + 1) % adImages.length;
-                    img.style.opacity = '0';
-                    setTimeout(() => {
-                        // Forzamos recarga con cache busting en cada rotación si es necesario
-                        img.src = adImages[currentIndex] + "&t=" + Date.now();
-                        img.style.opacity = '1';
-                    }, 500);
-                }, 7000); // 7 segundos por banner
-            }
-        };
-        startRotator();
-    }, 500);
+        const el = document.getElementById(uniqueId);
+        if (el && !el.dataset.running) {
+            el.dataset.running = "true";
+            let idx = 0;
+            setInterval(() => {
+                idx = (idx + 1) % adImages.length;
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.src = adImages[idx] + "&cache=" + Date.now();
+                    el.style.opacity = '1';
+                }, 400);
+            }, 8000);
+        }
+    }, 1000);
 
     return `
-        <div class="banner-container" style="width: 100%; max-width: 450px; margin: 15px auto; overflow: hidden; border-radius: 12px; box-shadow: var(--glass-shadow); border: 1px solid var(--glass-border); background: #000; position: relative; aspect-ratio: 450 / 75; height: auto; display: block !important;">
-            <img id="${uniqueId}" src="${adImages[0]}&t=${cacheBust}" 
-                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.6s ease-in-out; display: block; min-height: 50px;"
-                 onerror="this.src='https://via.placeholder.com/450x75?text=Goopi+Publicidad'">
-            <div style="position: absolute; top: 6px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px; font-family: sans-serif; letter-spacing: 1px; z-index: 10; pointer-events: none;">INFO</div>
+        <div class="banner-wrapper" style="width: 100%; max-width: 450px; margin: 20px auto; position: relative; z-index: 10;">
+            <div style="position: relative; width: 100%; padding-bottom: 16.666%; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
+                <img id="${uniqueId}" src="${adImages[0]}&v=${ts}" 
+                     style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.5s ease; display: block;">
+                <div style="position: absolute; top: 4px; right: 8px; background: rgba(0,0,0,0.6); color: rgba(255,255,255,0.8); font-size: 7px; padding: 2px 5px; border-radius: 4px; font-family: sans-serif; pointer-events: none; text-transform: uppercase;">Aviso</div>
+            </div>
         </div>
     `;
 }
@@ -186,19 +183,19 @@ function renderView(view, container) {
         case 'delivery':
             container.innerHTML = `
                 <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
-                    <!-- Botón Volver -->
-                    <button onclick="navigate('home')" style="position: absolute; top: 25px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <!-- BANNER NATIVO FLOTANTE (Superior) -->
+                    <div style="position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1001;">
+                        ${generateNativeAdHtml("", "map-top")}
+                    </div>
+                    
+                    <!-- Botón Volver (Ajustado) -->
+                    <button onclick="navigate('home')" style="position: absolute; top: 90px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-arrow-left"></i>
                     </button>
-                    
-                    <!-- BANNER NATIVO FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 75px; left: 10px; right: 10px; z-index: 1001;">
-                        ${generateNativeAdHtml("75px", "map-top")}
-                    </div>
 
-                    <!-- MAPA FONDO -->
+                    <!-- MAPA FONDO (Ocultando banner superior de la web con margin-top negativo mayor) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 95px); border: none; position: absolute; top: -95px; left: 0;" 
+                            style="width: 100%; height: calc(100% + 160px); border: none; position: absolute; top: -160px; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
@@ -258,10 +255,10 @@ function renderView(view, container) {
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <button style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
+                        <button onclick="socialLogin('Google')" style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
                             <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Google
                         </button>
-                        <button style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
+                        <button onclick="socialLogin('Facebook')" style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
                             <i class="fab fa-facebook-f"></i> Facebook
                         </button>
                     </div>
@@ -303,10 +300,10 @@ function renderView(view, container) {
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <button style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
+                        <button onclick="socialLogin('Google')" style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
                             <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Google
                         </button>
-                        <button style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
+                        <button onclick="socialLogin('Facebook')" style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
                             <i class="fab fa-facebook-f"></i> Facebook
                         </button>
                     </div>
@@ -476,6 +473,10 @@ function viewDetails(postId) {
 
 function closeDetails() {
     document.getElementById('details-overlay').classList.remove('active');
+}
+
+function socialLogin(provider) {
+    alert(`El inicio de sesión con ${provider} está siendo configurado. Por ahora, utiliza el registro por correo.`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
