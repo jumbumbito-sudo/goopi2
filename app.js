@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v8.3)
- * FIX: Limpieza mapa (ocultar Mapbox/Ads bottom) y banner 50% más arriba.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v9.0)
+ * FIX: Logo Force-Refresh (Cache-Fix) y posición Banner Mapa Extrema.
  */
 
 const wpConfig = {
@@ -14,7 +14,7 @@ const state = {
     posts: [] // Cache for details
 };
 
-const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?v=8.1";
+const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?force-refresh=" + Date.now();
 
 // URLs de Banners (Optimización Photon CDN para evitar bloqueos y caché)
 const adImages = [
@@ -183,8 +183,8 @@ function renderView(view, container) {
         case 'delivery':
             container.innerHTML = `
                 <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
-                    <!-- BANNER NATIVO FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 5px; left: 10px; right: 10px; z-index: 1001;">
+                    <!-- BANNER NATIVO FLOTANTE (Superior - Posición Extrema) -->
+                    <div style="position: absolute; top: 0px; left: 10px; right: 10px; z-index: 1001;">
                         ${generateNativeAdHtml("", "map-top")}
                     </div>
                     
