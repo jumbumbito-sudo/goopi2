@@ -1,5 +1,5 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.3)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.4)
  */
 
 const wpConfig = {
@@ -139,18 +139,18 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- Pantalla Dividida: Mapa Arriba, Banner Abajo (sobre el menú) -->
+                    <!-- AREA SUPERIOR: EL MAPA -->
                     <div style="flex: 1; width: 100%; overflow: hidden; position: relative; background: #000;">
                         <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                                style="width: 100%; height: calc(100% + 94px); border: none; position: absolute; top: -94px; left: 0;" 
+                                style="width: 100%; height: calc(100% + 95px); border: none; position: absolute; top: -95px; left: 0;" 
                                 allow="geolocation">
                         </iframe>
                     </div>
 
-                    <!-- Banners Publicitarios (Posicionado justo sobre la barra de navegación) -->
-                    <div style="height: 140px; width: 100%; background: #fff; overflow: hidden; position: relative; border-top: 3px solid var(--secondary-lilac); border-bottom: 2px solid #000;">
-                         <iframe src="https://goopiapp.com/publicidad/" 
-                                style="width: 100%; height: 600px; border: none; position: absolute; top: -335px; left: 0;">
+                    <!-- AREA INFERIOR: LOS BANNERS (Rotativos de la misma página) -->
+                    <div style="height: 200px; width: 100%; background: #fff; overflow: hidden; position: relative; border-top: 3px solid var(--secondary-lilac);">
+                         <iframe src="https://goopiapp.com/taxis-disponibles/" 
+                                style="width: 100%; height: 1000px; border: none; position: absolute; top: -535px; left: 0;">
                          </iframe>
                     </div>
                 </div>
