@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v27.0)
- * FIX: Participación en Sorteos corregida y Logout Asíncrono.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v28.0)
+ * FEATURE: Ruleta Goopi, Sistema de Puntos y Gamificación.
  */
 
 const wpConfig = {
@@ -12,6 +12,7 @@ const wpConfig = {
 // Firebase Safe-Initialization (v22.0)
 let auth = null;
 let db = null;
+let storage = null;
 let firebaseError = false;
 
 function initFirebase() {
@@ -31,6 +32,7 @@ function initFirebase() {
             }
             auth = firebase.auth();
             db = firebase.database();
+            storage = firebase.storage();
             auth.onAuthStateChanged((user) => {
                 console.log("Goopi Auth State:", user ? "Active Session" : "No Session");
                 if (user) syncFavorites(user.uid);
@@ -101,8 +103,10 @@ function enableMockAuth() {
 
 const state = {
     currentView: 'home',
-    posts: [], // Cache for details
-    userFavorites: {}
+    posts: [],
+    communityPosts: [],
+    userFavorites: {},
+    userPoints: 100
 };
 
 // Logo con timestamp dinámico para forzar actualización inmediata
@@ -263,19 +267,36 @@ function renderView(view, container, params = null) {
                     </button>
                 </section>
 
-                <!-- SECCIÓN PUNTOS GOOPI (Reemplaza banner inferior) -->
+                <!-- SECCIÓN PUNTOS GOOPI -->
                 <div style="margin-bottom: 90px; margin-top: 30px; padding: 0 5px;">
-                    <button onclick="window.location.href='https://goopiapp.com/puntos-goopi/'" class="action-card" 
-                        style="width: 100%; height: auto; padding: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #432e00; border: none; flex-direction: row; align-items: center; justify-content: center; gap: 15px; border-radius: 20px; box-shadow: 0 10px 25px rgba(255, 215, 0, 0.3); cursor: pointer; transition: 0.3s;">
+                    <button onclick="navigate('puntos')" class="action-card" 
+                        style="width: 100%; height: auto; padding: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #432e00; border: none; flex-direction: row; align-items: center; justify-content: center; gap: 15px; border-radius: 20px; box-shadow: 0 10px 25px rgba(255, 215, 0, 0.3); cursor: pointer; transition: 0.3s; position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: rgba(255,255,255,0.3); transform: skewX(-25deg); animation: shine 3s infinite;"></div>
                         <i class="fas fa-coins" style="font-size: 24px;"></i>
                         <div style="text-align: left;">
-                            <span style="display: block; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Puntos Goopi</span>
-                            <span style="display: block; font-size: 10px; font-weight: 400; opacity: 0.8;">Próximamente: Acumula y Canjea</span>
+                            <span style="display: block; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Mis Goopi Puntos</span>
+                            <span style="display: block; font-size: 12px; font-weight: 700;">Tienes: <span style="font-size: 14px; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px;">${state.userPoints} pts</span></span>
                         </div>
                     </button>
                 </div>
             `;
             initHomePage();
+            break;
+
+        case 'community':
+            container.innerHTML = `
+                <div id="community-feed" class="tiktok-feed">
+                    <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
+                        <p style="font-weight: 700; letter-spacing: 1px;">CARGANDO GOOPI REELS...</p>
+                    </div>
+                </div>
+
+                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 110px; z-index: 1000;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            `;
+            initCommunity();
             break;
 
         case 'taxi':
@@ -468,12 +489,63 @@ function renderView(view, container, params = null) {
             `;
             break;
 
+        case 'puntos':
+            container.innerHTML = `
+                <section class="hero" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #432e00; margin: -20px -20px 25px; padding: 40px 20px; border-radius: 0 0 40px 40px; text-align: center;">
+                    <h1 style="color: #432e00;">Ruleta de la Suerte</h1>
+                    <p>Gana premios increíbles con tus Goopi Puntos</p>
+                    <div style="margin-top: 15px; background: rgba(0,0,0,0.1); display: inline-block; padding: 5px 20px; border-radius: 20px; font-weight: 800; font-size: 18px;">
+                        Saldo: ${state.userPoints} pts
+                    </div>
+                </section>
+
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 30px; padding-bottom: 100px;">
+                    <!-- RULETA CONTAINER -->
+                    <div style="position: relative; width: 300px; height: 300px;">
+                        <!-- FLECHA -->
+                        <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ff4b2b; z-index: 10;"></div>
+                        
+                        <!-- CIRCULO RULETA -->
+                        <div id="wheel" style="width: 100%; height: 100%; border-radius: 50%; border: 10px solid #432e00; background: conic-gradient(
+                            #ba96ff 0deg 45deg, 
+                            #8c309b 45deg 90deg, 
+                            #ba96ff 90deg 135deg, 
+                            #8c309b 135deg 180deg, 
+                            #ba96ff 180deg 225deg, 
+                            #8c309b 225deg 270deg, 
+                            #ba96ff 270deg 315deg, 
+                            #8c309b 315deg 360deg
+                        ); position: relative; transition: transform 4s cubic-bezier(0.15, 0, 0.15, 1); box-shadow: 0 0 30px rgba(0,0,0,0.5);">
+                            <!-- NÚMEROS/PREMIOS EN LA RULETA -->
+                            <div style="position: absolute; width: 100%; height: 100%; font-weight: 900; color: white;">
+                                <span style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%);">10 pts</span>
+                                <span style="position: absolute; top: 50%; right: 20px; transform: translateY(-50%) rotate(90deg);">GRATIS</span>
+                                <span style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%) rotate(180deg);">50 pts</span>
+                                <span style="position: absolute; top: 50%; left: 20px; transform: translateY(-50%) rotate(-90deg);">X2</span>
+                            </div>
+                        </div>
+
+                        <!-- BOTÓN CENTRAL -->
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; background: white; border-radius: 50%; border: 5px solid #432e00; z-index: 5; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #432e00; font-size: 10px;">GOOPI</div>
+                    </div>
+
+                    <button onclick="spinWheel()" id="spin-btn" class="action-card" style="width: 80%; background: #432e00; color: #FFD700; border: none; justify-content: center; padding: 18px; font-weight: 900; font-size: 16px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3);">
+                        GIRAR (COSTO: 30 PTS)
+                    </button>
+
+                    <div style="text-align: center; color: var(--text-dim); font-size: 13px; max-width: 250px;">
+                        <i class="fas fa-info-circle"></i> Los premios se acreditan instantáneamente a tu saldo Gooper.
+                    </div>
+                </div>
+            `;
+            break;
+
         case 'profile':
             const user = auth ? auth.currentUser : null;
             const favIds = Object.keys(state.userFavorites);
+            const userPosts = state.communityPosts.filter(p => p.userId === (user ? user.uid : ''));
 
             let favoritesHtml = `<div style="padding: 20px; text-align: center; color: var(--text-dim);">Aún no tienes favoritos.</div>`;
-
             if (favIds.length > 0) {
                 favoritesHtml = favIds.map(id => {
                     const fav = state.userFavorites[id];
@@ -490,36 +562,40 @@ function renderView(view, container, params = null) {
             }
 
             container.innerHTML = `
-                <div style="text-align: center; margin-top: 40px;">
-                    <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac);">
+                <div style="text-align: center; margin-top: 40px; position: relative;">
+                    <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border);">
                         <i class="fas fa-user-astronaut"></i>
                     </div>
-                    <h1 style="font-size: 26px; font-weight: 800;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
-                    <p style="color: var(--text-dim);">${user ? user.email : 'Inicia sesión para más funciones'}</p>
+                    <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900;">VERIFICADO</div>
+                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
+                    <p style="color: var(--text-dim); padding-bottom: 20px;">${user ? user.email : 'Inicia sesión para más funciones'}</p>
                 </div>
                 
-                <div style="margin-top: 40px; padding-bottom: 100px;">
-                    <div class="section-header">
-                        <h2>Tus Favoritos</h2>
-                        <span style="font-size: 12px; color: var(--secondary-lilac);">${favIds.length} guardados</span>
+                <div style="margin-top: 20px; padding-bottom: 150px;">
+                    <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${state.userPoints}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${favIds.length}</div><div style="font-size: 10px; color: var(--text-dim);">FAVS</div></div>
                     </div>
-                    ${favoritesHtml}
 
-                    <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 10px;">
+                    <div class="section-header">
+                        <h2>Mis Gooper Reels</h2>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 30px;">
+                        ${userPosts.length > 0 ? userPosts.map(p => `
+                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="navigate('community')">
+                                ${p.mediaUrl ? (p.mediaType === 'video' ? `<video src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;"></video>` : `<img src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;">`) : `<div style="padding: 5px; font-size: 8px; color: var(--text-dim); overflow: hidden;">${p.text}</div>`}
+                            </div>
+                        `).join('') : '<div style="grid-column: span 3; color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px;">No has grabado Reels todavía.</div>'}
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
                         <button onclick="navigate('mensajes')" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 18px; position: relative; overflow: hidden;">
                             <span>
                                 <i class="fas fa-comment-dots" style="margin-right: 12px; color: var(--secondary-lilac); font-size: 18px;"></i> 
-                                <span style="font-weight: 700;">Mensajería Central</span>
+                                <span style="font-weight: 700;">Mensajes</span>
                             </span>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span style="background: #ff4b2b; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 800;">2 NUEVOS</span>
-                                <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
-                            </div>
-                        </button>
-
-                        <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 15px;">
-                            <span><i class="fas fa-history" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Mis Viajes (Próximamente)</span>
-                            <i class="fas fa-chevron-right"></i>
+                            <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
                         </button>
                         
                         ${user ? `
@@ -980,6 +1056,341 @@ function socialLogin(provider) {
     alert(`El inicio de sesión con ${provider} está siendo configurado. Por ahora, utiliza el registro por correo.`);
 }
 
+// --- COMMUNITY LOGIC (v1.0) ---
+async function initCommunity() {
+    if (!db) initFirebase();
+    const communityRef = db.ref('community/posts');
+    communityRef.on('value', (snapshot) => {
+        const postsData = snapshot.val() || {};
+        state.communityPosts = Object.keys(postsData).map(key => ({
+            id: key,
+            ...postsData[key]
+        })).sort((a, b) => b.timestamp - a.timestamp);
+
+        if (state.currentView === 'community') {
+            renderCommunityPosts();
+        }
+    });
+}
+
+function renderCommunityPosts() {
+    const feed = document.getElementById('community-feed');
+    if (!feed) return;
+
+    if (state.communityPosts.length === 0) {
+        feed.innerHTML = `
+            <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;">
+                <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 20px; opacity: 0.5;"></i>
+                <h2>Aún no hay Reels</h2>
+                <p style="color: var(--text-dim);">¡Sé el primero en compartir un momento Gooper!</p>
+            </div>`;
+        return;
+    }
+
+    feed.innerHTML = state.communityPosts.map((post, index) => {
+        const user = auth?.currentUser;
+        const isLiked = post.likes && post.likes[user?.uid];
+        const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+        const commentsCount = post.comments ? Object.keys(post.comments).length : 0;
+
+        let mediaHtml = '';
+        if (post.mediaUrl) {
+            if (post.mediaType === 'video') {
+                mediaHtml = `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${index === 0 ? 'autoplay' : ''} muted onclick="togglePlay(this)"></video>`;
+            } else {
+                mediaHtml = `<img src="${post.mediaUrl}" class="tiktok-media">`;
+            }
+        } else {
+            // Placeholder color if no media
+            mediaHtml = `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a0b2e, #2d1b4d);"></div>`;
+        }
+
+        return `
+            <div class="tiktok-post">
+                ${mediaHtml}
+                <div class="tiktok-overlay"></div>
+                
+                <div class="tiktok-info">
+                    <h3>@${post.userName.replace(/\s+/g, '').toLowerCase()}</h3>
+                    <p>${post.text}</p>
+                </div>
+
+                <div class="tiktok-actions">
+                    <div class="user-avatar" style="width: 50px; height: 50px; border: 2px solid white; margin-bottom: 10px;">
+                        ${post.userName.substring(0, 1).toUpperCase()}
+                    </div>
+                    
+                    <button onclick="togglePostLike('${post.id}')" class="tiktok-btn ${isLiked ? 'liked' : ''}">
+                        <i class="fas fa-heart"></i>
+                        <span>${likesCount}</span>
+                    </button>
+
+                    <button onclick="toggleComments('${post.id}')" class="tiktok-btn">
+                        <i class="fas fa-comment-dots"></i>
+                        <span>${commentsCount}</span>
+                    </button>
+
+                    <button onclick="sharePost('Gooper Reel', 'Mira este momento en Goopi App', 'https://goopiapp.com')" class="tiktok-btn">
+                        <i class="fas fa-share"></i>
+                        <span>Share</span>
+                    </button>
+                </div>
+
+                <!-- Detached Comment Overlay -->
+                <div id="comments-${post.id}" class="details-overlay" style="background: rgba(0,0,0,0.9); backdrop-filter: blur(20px);">
+                    <button class="back-btn" onclick="toggleComments('${post.id}')">
+                        <i class="fas fa-times"></i> Cerrar Comentarios
+                    </button>
+                    <div style="flex: 1; overflow-y: auto; padding: 10px;" id="comments-list-${post.id}">
+                        ${post.comments ? Object.values(post.comments).map(c => `
+                            <div class="comment" style="margin-bottom: 20px;">
+                                <div class="comment-avatar" style="background: var(--secondary-lilac);">${c.userName.substring(0, 1).toUpperCase()}</div>
+                                <div class="comment-body" style="background: rgba(255,255,255,0.1);">
+                                    <div style="font-weight: 800; color: var(--secondary-lilac);">${c.userName}</div>
+                                    <div style="color: white; font-size: 14px; margin-top: 4px;">${c.text}</div>
+                                </div>
+                            </div>
+                        `).join('') : '<div style="text-align: center; color: var(--text-dim); margin-top: 40px;">No hay comentarios todavía.</div>'}
+                    </div>
+                    <div style="padding: 20px; border-top: 1px solid var(--glass-border); display: flex; gap: 10px;">
+                        <input type="text" id="comment-input-${post.id}" placeholder="Escribe un comentario..." 
+                               style="flex: 1; background: #222; border: 1px solid #444; border-radius: 12px; color: white; padding: 12px; outline: none;">
+                        <button onclick="addComment('${post.id}')" 
+                                style="background: var(--secondary-lilac); border: none; border-radius: 12px; padding: 0 20px; color: white;">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Auto-play videos as they come into view
+    setupScrollListener();
+}
+
+function togglePlay(video) {
+    if (video.paused) video.play();
+    else video.pause();
+}
+
+function setupScrollListener() {
+    const feed = document.getElementById('community-feed');
+    if (!feed) return;
+
+    feed.addEventListener('scroll', () => {
+        const posts = document.querySelectorAll('.tiktok-post');
+        posts.forEach(post => {
+            const video = post.querySelector('video');
+            if (!video) return;
+
+            const rect = post.getBoundingClientRect();
+            if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+                if (video.paused) video.play();
+            } else {
+                video.pause();
+            }
+        });
+    }, { passive: true });
+}
+
+function showPostComposer() {
+    if (!auth || !auth.currentUser) {
+        alert("Debes iniciar sesión para publicar en la comunidad.");
+        navigate('login');
+        return;
+    }
+
+    const overlay = document.getElementById('details-overlay');
+    const content = document.getElementById('details-content');
+
+    content.innerHTML = `
+        <h1 style="font-size: 24px; color: var(--secondary-lilac); margin-bottom: 20px;">Nueva Publicación</h1>
+        <div class="social-composer" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px;">
+            <textarea id="post-text" placeholder="¿Qué está pasando en tu mundo Gooper?" style="width: 100%; height: 120px; background: none; border: none; color: white; outline: none; font-size: 16px; resize: none;"></textarea>
+            
+            <div id="media-preview-container" style="margin-top: 15px; display: none; position: relative;">
+                <img id="media-preview" style="width: 100%; border-radius: 12px;">
+                <button onclick="clearMediaPre()" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); border: none; color: white; width: 30px; height: 30px; border-radius: 50%;"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <label class="media-upload-label">
+                    <i class="fas fa-camera"></i> Foto/Video
+                    <input type="file" id="post-media-file" accept="image/*,video/*" style="display: none;" onchange="previewMedia(this)">
+                </label>
+                <button id="submit-post-btn" onclick="submitPost()" class="action-card" style="width: auto; padding: 12px 25px; background: var(--secondary-lilac); border: none; color: white; font-weight: 800; border-radius: 15px;">
+                    PUBLICAR
+                </button>
+            </div>
+        </div>
+    `;
+    overlay.classList.add('active');
+}
+
+function previewMedia(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const container = document.getElementById('media-preview-container');
+            const preview = document.getElementById('media-preview');
+            preview.src = e.target.result;
+            container.style.display = 'block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function clearMediaPre() {
+    const container = document.getElementById('media-preview-container');
+    const input = document.getElementById('post-media-file');
+    container.style.display = 'none';
+    input.value = '';
+}
+
+async function submitPost() {
+    const text = document.getElementById('post-text').value;
+    const file = document.getElementById('post-media-file').files[0];
+    const btn = document.getElementById('submit-post-btn');
+
+    if (!text && !file) {
+        alert("Escribe algo o sube una foto.");
+        return;
+    }
+
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PUBLICANDO...';
+    btn.disabled = true;
+
+    try {
+        let mediaUrl = null;
+        let mediaType = null;
+
+        if (file) {
+            const storageRef = storage.ref(`community/${Date.now()}_${file.name}`);
+            await storageRef.put(file);
+            mediaUrl = await storageRef.getDownloadURL();
+            mediaType = file.type.startsWith('video') ? 'video' : 'image';
+        }
+
+        const user = auth.currentUser;
+        const postData = {
+            userId: user.uid,
+            userName: user.displayName || 'Gooper Anonymous',
+            text: text,
+            mediaUrl: mediaUrl,
+            mediaType: mediaType,
+            timestamp: Date.now(),
+            likes: {}
+        };
+
+        await db.ref('community/posts').push(postData);
+        closeDetails();
+        alert("¡Publicado en la comunidad!");
+    } catch (e) {
+        console.error(e);
+        alert("Error al publicar: " + e.message);
+    } finally {
+        btn.innerHTML = 'PUBLICAR';
+        btn.disabled = false;
+    }
+}
+
+function toggleComments(postId) {
+    const section = document.getElementById(`comments-${postId}`);
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addComment(postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const text = input.value;
+    if (!text) return;
+
+    if (!auth?.currentUser) {
+        alert("Inicia sesión para comentar.");
+        return;
+    }
+
+    const user = auth.currentUser;
+    const commentData = {
+        userId: user.uid,
+        userName: user.displayName || 'Gooper',
+        text: text,
+        timestamp: Date.now()
+    };
+
+    try {
+        await db.ref(`community/posts/${postId}/comments`).push(commentData);
+        input.value = '';
+    } catch (e) {
+        alert("Error al comentar.");
+    }
+}
+
+async function togglePostLike(postId) {
+    if (!auth?.currentUser) {
+        alert("Inicia sesión para dar like.");
+        return;
+    }
+
+    const user = auth.currentUser;
+    const likeRef = db.ref(`community/posts/${postId}/likes/${user.uid}`);
+
+    const snapshot = await likeRef.once('value');
+    if (snapshot.exists()) {
+        likeRef.remove();
+    } else {
+        likeRef.set(true);
+    }
+}
+
+function spinWheel() {
+    if (state.userPoints < 30) {
+        alert("¡Ups! No tienes suficientes puntos para girar la ruleta. Guarda locales favoritos para ganar más.");
+        return;
+    }
+
+    const wheel = document.getElementById('wheel');
+    const btn = document.getElementById('spin-btn');
+    if (!wheel || btn.disabled) return;
+
+    // Restar puntos inmediatamente
+    state.userPoints -= 30;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.innerHTML = "GIRANDO...";
+
+    // Calcular rotación (mínimo 5 vueltas + ángulo aleatorio)
+    const extraDeg = Math.floor(Math.random() * 360);
+    const totalDeg = 1800 + extraDeg;
+
+    wheel.style.transform = `rotate(${totalDeg}deg) `;
+
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.innerHTML = "GIRAR (COSTO: 30 PTS)";
+
+        // Calcular premio (cada 45 grados cambia la rebanada)
+        const prizeIndex = Math.floor(((360 - (extraDeg % 360)) / 45));
+        const prizes = [
+            { txt: "Ganas 10 pts", val: 10 },
+            { txt: "Ticket Sorteo", val: 0, msg: "¡Has ganado un ticket extra para el sorteo!" },
+            { txt: "Ganas 50 pts", val: 50 },
+            { txt: "Mucho Ojo", val: 0, msg: "¡Casi! Sigue participando." },
+            { txt: "Ganas 100 pts", val: 100 },
+            { txt: "Multiplicador X2", val: 60, msg: "¡Doble de puntos! Ganas 60 pts." },
+            { txt: "Ganas 20 pts", val: 20 },
+            { txt: "Sigue Goopeando", val: 0, msg: "¡Suerte para la próxima!" }
+        ];
+
+        const prize = prizes[prizeIndex % 8];
+        state.userPoints += prize.val;
+
+        alert(prize.msg || `¡Felicidades! ${prize.txt}`);
+        navigate('puntos'); // Refrescar vista
+    }, 4500);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.querySelector('.main-content');
 
@@ -995,6 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initFirebase();
+    initCommunity();
     renderView('home', mainContent);
 
     // Register Service Worker for PWA
