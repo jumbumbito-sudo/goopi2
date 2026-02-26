@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v17.0)
- * FEATURE: UX de Registro y Login mejorada, Toggle Password.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v18.0)
+ * FIX: Reubicación de botón de registro para máxima visibilidad.
  */
 
 const wpConfig = {
@@ -302,8 +302,13 @@ function renderView(view, container, params = null) {
                         ENTRAR AHORA
                     </button>
 
-                    <div style="text-align: right; margin-top: 5px;">
+                    <div style="text-align: right; margin-top: 5px; margin-bottom: 20px;">
                         <a href="#" onclick="handleResetPassword()" style="color: var(--text-dim); font-size: 12px; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+                    </div>
+                    
+                    <div style="text-align: center; background: rgba(186, 150, 255, 0.1); padding: 20px; border-radius: 18px; border: 1px dashed var(--secondary-lilac);">
+                        <p style="color: white; font-size: 14px; margin-bottom: 10px;">¿Eres nuevo en Goopi?</p>
+                        <button onclick="navigate('register')" style="background: var(--secondary-lilac); color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 800; cursor: pointer; width: 100%;">CREA TU CUENTA GRATIS AQUÍ</button>
                     </div>
                     
                     <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
@@ -321,9 +326,7 @@ function renderView(view, container, params = null) {
                         </button>
                     </div>
 
-                    <div style="text-align: center; margin-top: 25px;">
-                        <p style="color: var(--text-dim); font-size: 14px;">¿No tienes cuenta? <a href="#" onclick="navigate('register')" style="color: var(--secondary-lilac); font-weight: 800; text-decoration: none;">Crea una aquí</a></p>
-                    </div>
+
                 </div>
             `;
             break;
