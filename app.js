@@ -1,5 +1,5 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.2)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.3)
  */
 
 const wpConfig = {
@@ -139,19 +139,19 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- Banners Publicitarios (Corte Preciso -330px para móvil) -->
-                    <div style="height: 130px; width: 100%; background: #fff; overflow: hidden; position: relative; border-bottom: 3px solid var(--secondary-lilac);">
-                         <iframe src="https://goopiapp.com/publicidad/" 
-                                style="width: 100%; height: 600px; border: none; position: absolute; top: -330px; left: 0;">
-                         </iframe>
-                    </div>
-
-                    <!-- Mapa (Corte Preciso -150px para móvil) -->
+                    <!-- Pantalla Dividida: Mapa Arriba, Banner Abajo (sobre el menú) -->
                     <div style="flex: 1; width: 100%; overflow: hidden; position: relative; background: #000;">
                         <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                                style="width: 100%; height: calc(100% + 150px); border: none; position: absolute; top: -150px; left: 0;" 
+                                style="width: 100%; height: calc(100% + 94px); border: none; position: absolute; top: -94px; left: 0;" 
                                 allow="geolocation">
                         </iframe>
+                    </div>
+
+                    <!-- Banners Publicitarios (Posicionado justo sobre la barra de navegación) -->
+                    <div style="height: 140px; width: 100%; background: #fff; overflow: hidden; position: relative; border-top: 3px solid var(--secondary-lilac); border-bottom: 2px solid #000;">
+                         <iframe src="https://goopiapp.com/publicidad/" 
+                                style="width: 100%; height: 600px; border: none; position: absolute; top: -335px; left: 0;">
+                         </iframe>
                     </div>
                 </div>
             `;
