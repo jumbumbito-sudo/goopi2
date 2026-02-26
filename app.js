@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v12.0)
- * FIX: Búsqueda interna, Navegación con parámetros y Logo Force-Time.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v13.0)
+ * FIX: Autenticación REAL con Firebase (Login/Registro/Persistencia).
  */
 
 const wpConfig = {
@@ -8,6 +8,21 @@ const wpConfig = {
     user: "jumbumbito@gmail.com",
     appPassword: "8wHv UbIC nUXg VogE DHcP VSYn"
 };
+
+// Firebase Configuration (v13.0)
+const firebaseConfig = {
+    apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
+    authDomain: "taxi-macas-52717.firebaseapp.com",
+    databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
+    projectId: "taxi-macas-52717",
+    storageBucket: "taxi-macas-52717.firebasestorage.app",
+    messagingSenderId: "206011903079",
+    appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
+};
+
+// Initialize Firebase SDK
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 
 const state = {
     currentView: 'home',
@@ -324,16 +339,16 @@ function renderView(view, container, params = null) {
             break;
 
         case 'profile':
-            const user = JSON.parse(localStorage.getItem('goopi_user'));
+            const user = auth.currentUser;
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px;">
                     <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac);">
                         <i class="fas fa-user-astronaut"></i>
                     </div>
-                    <h1 style="font-size: 26px; font-weight: 800;">${user ? user.name : 'Gooper'}</h1>
+                    <h1 style="font-size: 26px; font-weight: 800;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
                     <p style="color: var(--text-dim);">${user ? user.email : ''}</p>
                 </div>
-                <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 15px;">
+                <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 80px;">
                     <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 20px;">
                         <span><i class="fas fa-history" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Mis Viajes</span>
                         <i class="fas fa-chevron-right"></i>
@@ -581,23 +596,15 @@ async function handleLogin() {
     btn.disabled = true;
 
     try {
-        // En un entorno WordPress real, usaríamos JWT o Application Passwords
-        // Para esta integración inicial, buscaremos si el usuario existe o simularemos el éxito
-        // si el usuario está registrado en localStorage (para pruebas rápidas)
-        const storedUser = JSON.parse(localStorage.getItem(`user_${email}`));
-
-        if (storedUser && storedUser.pass === pass) {
-            localStorage.setItem('goopi_user', JSON.stringify(storedUser));
-            alert(`¡Bienvenido de nuevo, ${storedUser.name}!`);
-            navigate('home');
-            updateHeader();
-        } else {
-            // Intento de validación real contra WP si se desea, 
-            // pero por seguridad y rapidez usaremos el sistema local por ahora
-            alert("Usuario o contraseña incorrectos.");
-        }
+        await auth.signInWithEmailAndPassword(email, pass);
+        // El listener onAuthStateChanged se encargará de navegar y actualizar
+        alert("¡Bienvenido de nuevo!");
+        navigate('home');
     } catch (e) {
-        alert("Error al iniciar sesión.");
+        console.error("Login Error:", e);
+        if (e.code === 'auth/user-not-found') alert("Usuario no encontrado.");
+        else if (e.code === 'auth/wrong-password') alert("Contraseña incorrecta.");
+        else alert("Error al iniciar sesión: " + e.message);
     } finally {
         btn.innerHTML = 'ENTRAR AHORA';
         btn.disabled = false;
@@ -615,35 +622,45 @@ async function handleRegister() {
         return;
     }
 
+    if (pass.length < 6) {
+        alert("La contraseña debe tener al menos 6 caracteres.");
+        return;
+    }
+
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> CREANDO CUENTA...';
     btn.disabled = true;
 
     try {
-        // Registro persistente en LocalStorage (simulando DB de WP para la PWA)
-        const newUser = { name, email, pass };
-        localStorage.setItem(`user_${email}`, JSON.stringify(newUser));
-        localStorage.setItem('goopi_user', JSON.stringify(newUser));
+        const userCredential = await auth.createUserWithEmailAndPassword(email, pass);
+        // Actualizar el perfil con el nombre
+        await userCredential.user.updateProfile({
+            displayName: name
+        });
 
         alert("¡Cuenta creada con éxito! Bienvenido a Goopi.");
         navigate('home');
-        updateHeader();
     } catch (e) {
-        alert("Error al crear la cuenta.");
+        console.error("Register Error:", e);
+        if (e.code === 'auth/email-already-in-use') alert("Este correo ya está registrado.");
+        else alert("Error al crear cuenta: " + e.message);
     } finally {
         btn.innerHTML = 'CREAR MI CUENTA';
         btn.disabled = false;
     }
 }
 
-function handleLogout() {
-    localStorage.removeItem('goopi_user');
-    alert("Sesión cerrada.");
-    navigate('home');
-    updateHeader();
+async function handleLogout() {
+    try {
+        await auth.signOut();
+        alert("Sesión cerrada.");
+        navigate('home');
+    } catch (e) {
+        alert("Error al cerrar sesión.");
+    }
 }
 
 function updateHeader() {
-    const user = localStorage.getItem('goopi_user');
+    const user = auth.currentUser;
     const userBtn = document.querySelector('button[onclick="navigate(\'login\')"]');
     if (userBtn) {
         if (user) {
@@ -677,7 +694,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderView('home', mainContent);
-    updateHeader();
+
+    // Listener de estado de autenticación REAL de Firebase
+    auth.onAuthStateChanged((user) => {
+        console.log("Auth State Changed:", user ? "LoggedIn" : "LoggedOut");
+        updateHeader();
+    });
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
