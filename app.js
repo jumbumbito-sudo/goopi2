@@ -1,5 +1,5 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.5)
  */
 
 const wpConfig = {
@@ -37,6 +37,17 @@ function getCategoryIcon(name) {
         if (slug.includes(key)) return categoryIcons[key];
     }
     return categoryIcons['default'];
+}
+
+// Generador de Banner Rotativo (Corte preciso de la página /publicidad/)
+function generateBannerHtml(height = "150px", marginTop = "0px") {
+    return `
+        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; margin-top: ${marginTop}; box-shadow: 0 5px 15px rgba(0,0,0,0.3); border: 2px solid var(--secondary-lilac);">
+            <iframe src="https://goopiapp.com/publicidad/" 
+                    style="width: 100%; height: 600px; border: none; position: absolute; top: -335px; left: 0;">
+            </iframe>
+        </div>
+    `;
 }
 
 function navigate(view) {
@@ -110,6 +121,12 @@ function renderView(view, container) {
                         <div style="padding: 20px; color: var(--text-dim); font-size: 14px;">Sincronizando Goopi Hub...</div>
                     </div>
                 </section>
+                
+                <!-- PUBLICIDAD EN HOME (Parte Media) -->
+                <div style="margin-top: 25px;">
+                    ${generateBannerHtml("140px")}
+                </div>
+
                 <section class="categories" style="margin-top: 30px; margin-bottom: 20px;">
                     <div class="section-header">
                         <h2>Categorías</h2>
@@ -119,7 +136,7 @@ function renderView(view, container) {
                     </div>
                 </section>
 
-                <section class="units-area" style="margin-top: 25px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 30px;">
+                <section class="units-area" style="margin-top: 25px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px;">
                     <button onclick="window.location.href='https://goopiapp.com/registro-de-taxistas/'" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                         <i class="fas fa-id-card"></i> Registro de Unidades
                     </button>
@@ -127,6 +144,12 @@ function renderView(view, container) {
                         <i class="fas fa-tachometer-alt"></i> Panel de Unidades
                     </button>
                 </section>
+
+                <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
+                <div style="margin-top: 10px; margin-bottom: 40px;">
+                    <p style="color: var(--text-dim); font-size: 11px; margin-bottom: 8px; text-align: center;">Publicidad Destacada</p>
+                    ${generateBannerHtml("140px")}
+                </div>
             `;
             initHomePage();
             break;
@@ -134,25 +157,22 @@ function renderView(view, container) {
         case 'taxi':
         case 'delivery':
             container.innerHTML = `
-                <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500; display: flex; flex-direction: column;">
-                    <button onclick="navigate('home')" style="position: absolute; top: 25px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
+                    <!-- Botón Volver -->
+                    <button onclick="navigate('home')" style="position: absolute; top: 25px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- AREA SUPERIOR: EL MAPA -->
-                    <div style="flex: 1; width: 100%; overflow: hidden; position: relative; background: #000;">
-                        <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                                style="width: 100%; height: calc(100% + 95px); border: none; position: absolute; top: -95px; left: 0;" 
-                                allow="geolocation">
-                        </iframe>
+                    <!-- BANNER FLOTANTE (Superior) -->
+                    <div style="position: absolute; top: 85px; left: 10px; right: 10px; z-index: 1001;">
+                        ${generateBannerHtml("130px")}
                     </div>
 
-                    <!-- AREA INFERIOR: LOS BANNERS (Rotativos de la misma página) -->
-                    <div style="height: 200px; width: 100%; background: #fff; overflow: hidden; position: relative; border-top: 3px solid var(--secondary-lilac);">
-                         <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                                style="width: 100%; height: 1000px; border: none; position: absolute; top: -535px; left: 0;">
-                         </iframe>
-                    </div>
+                    <!-- MAPA FONDO -->
+                    <iframe src="https://goopiapp.com/taxis-disponibles/" 
+                            style="width: 100%; height: calc(100% + 95px); border: none; position: absolute; top: -95px; left: 0;" 
+                            allow="geolocation">
+                    </iframe>
                 </div>
             `;
             break;
