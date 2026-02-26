@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v22.0)
- * FIX: Sincronización CDN global (Unpkg), Carga en Head y Estabilidad total.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v23.0)
+ * DEBUG: Sistema de Diagnóstico Auth integrado para resolver persistencia.
  */
 
 const wpConfig = {
@@ -57,6 +57,22 @@ function syncFavorites(uid) {
             renderView('profile', mainContent);
         }
     });
+}
+
+function getAuthStatusHtml() {
+    let status = "🔴 DESCONECTADO";
+    let color = "#ff3b30";
+    if (typeof firebase !== 'undefined') {
+        status = "🟡 SDK CARGADO";
+        color = "#ffcc00";
+        if (auth) {
+            status = "🟢 MOTOR LISTO";
+            color = "#4cd964";
+        }
+    }
+    return `<div id="auth-debug" style="font-size: 10px; color: ${color}; margin-bottom: 15px; font-weight: 800; letter-spacing: 1px;">
+        <i class="fas fa-signal"></i> ESTADO: ${status}
+    </div>`;
 }
 
 const state = {
@@ -291,6 +307,7 @@ function renderView(view, container, params = null) {
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px;">
                     <img src="${LOGO_URL}" style="height: 120px; margin-bottom: 20px; filter: drop-shadow(0 0 10px var(--secondary-lilac));">
+                    ${getAuthStatusHtml()}
                     <h1 style="font-size: 28px; text-shadow: 0 0 10px var(--secondary-lilac); font-weight: 800;">Hola de nuevo</h1>
                     <p style="color: var(--text-dim);">Ingresa a tu cuenta Gooper</p>
                 </div>
@@ -340,6 +357,7 @@ function renderView(view, container, params = null) {
         case 'register':
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 30px;">
+                    ${getAuthStatusHtml()}
                     <h1 style="font-size: 28px; text-shadow: 0 0 10px var(--secondary-lilac); font-weight: 800;">Registro</h1>
                     <p style="color: var(--text-dim);">Únete a la red regional Goopi</p>
                 </div>
