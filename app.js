@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v16.0)
- * FEATURE: Sistema de Favoritos sincronizado con Firebase Database.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v17.0)
+ * FEATURE: UX de Registro y Login mejorada, Toggle Password.
  */
 
 const wpConfig = {
@@ -293,9 +293,10 @@ function renderView(view, container, params = null) {
                         <i class="fas fa-envelope" style="color: var(--secondary-lilac);"></i>
                         <input type="email" id="login-email" placeholder="Correo electrónico" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
                     </div>
-                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px; position: relative;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
                         <input type="password" id="login-pass" placeholder="Contraseña" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
+                        <i class="fas fa-eye" id="toggle-login-pass" onclick="togglePasswordVisibility('login-pass', this)" style="color: var(--text-dim); cursor: pointer; font-size: 14px;"></i>
                     </div>
                     <button id="login-btn" onclick="handleLogin()" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4); border-radius: 18px; cursor: pointer;">
                         ENTRAR AHORA
@@ -342,11 +343,12 @@ function renderView(view, container, params = null) {
                         <i class="fas fa-envelope" style="color: var(--secondary-lilac);"></i>
                         <input type="email" id="reg-email" placeholder="Email" style="background: none; border: none; color: white; width: 100%; outline: none;">
                     </div>
-                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px; position: relative;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
-                        <input type="password" id="reg-pass" placeholder="Define tu contraseña" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <input type="password" id="reg-pass" placeholder="Crea una contraseña" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <i class="fas fa-eye" id="toggle-reg-pass" onclick="togglePasswordVisibility('reg-pass', this)" style="color: var(--text-dim); cursor: pointer; font-size: 14px;"></i>
                     </div>
-                    <button id="reg-btn" onclick="handleRegister()" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #00f3ff 0%, #00a8b3 100%); color: #00363d; border-radius: 18px; cursor: pointer;">
+                    <button id="reg-btn" onclick="handleRegister()" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; border-radius: 18px; cursor: pointer;">
                         CREAR MI CUENTA
                     </button>
 
@@ -799,6 +801,16 @@ function updateHeader() {
 }
 
 
+function togglePasswordVisibility(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
 
 function socialLogin(provider) {
     alert(`El inicio de sesión con ${provider} está siendo configurado. Por ahora, utiliza el registro por correo.`);
