@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.7)
- * FUERZA DE ACTUALIZACIÓN: Se ha aplicado un "Cache Busting" para asegurar que veas los cambios.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.8)
+ * FIX: Banners con URLs corregidas y altura reducida (75px).
  */
 
 const wpConfig = {
@@ -16,11 +16,11 @@ const state = {
 
 const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
 
-// URLs Directas de los Banners (Extraídas de goopiapp.com/publicidad/)
+// URLs Directas de los Banners (Corregidas 2026/02)
 const adImages = [
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/09/iccan.png",
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/11/Screenshot_20241113-111000_1-scaled.jpg",
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/07/adam-travel.png"
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/1.png",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/2.png",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/3.png"
 ];
 
 const categoryIcons = {
@@ -47,8 +47,8 @@ function getCategoryIcon(name) {
     return categoryIcons['default'];
 }
 
-// Generador de Carrusel Nativo (Más estable que iframes)
-function generateNativeAdHtml(height = "160px", idPrefix = "ad") {
+// Generador de Carrusel Nativo (Más estable que iframes) - Altura Reducida
+function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
     const uniqueId = `ad-img-${idPrefix}`;
 
     // Script para rotar las imágenes localmente
@@ -63,15 +63,15 @@ function generateNativeAdHtml(height = "160px", idPrefix = "ad") {
                     img.src = adImages[currentIndex];
                     img.style.opacity = '1';
                 }, 500);
-            }, 5000);
+            }, 6000); // 6 segundos por banner
         }
     }, 100);
 
     return `
-        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); border: 2px solid var(--secondary-lilac); display: flex; align-items: center; justify-content: center; margin: 10px 0;">
+        <div style="height: ${height}; width: 100%; background: #000; overflow: hidden; position: relative; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 12px 0;">
             <img id="${uniqueId}" src="${adImages[0]}" 
-                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.5s ease-in-out;">
-            <div style="position: absolute; top: 5px; right: 10px; background: rgba(0,0,0,0.5); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px;">AD</div>
+                 style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.5s ease-in-out;">
+            <div style="position: absolute; top: 4px; right: 8px; background: rgba(0,0,0,0.6); color: white; font-size: 7px; padding: 1px 4px; border-radius: 8px; font-family: sans-serif; letter-spacing: 1px;">ANUNCIO</div>
         </div>
     `;
 }
@@ -109,13 +109,10 @@ function navigate(view) {
     }
 
     mainContent.style.opacity = '0';
-    mainContent.style.transform = 'translateY(10px)';
-
     setTimeout(() => {
         renderView(view, mainContent);
         mainContent.style.opacity = '1';
-        mainContent.style.transform = 'translateY(0)';
-    }, 200);
+    }, 100);
 
     state.currentView = view;
 }
@@ -128,7 +125,7 @@ function renderView(view, container) {
                     <h1 style="text-shadow: 0 0 10px var(--secondary-lilac);">¡Hola, Gooper!</h1>
                     <p>¿Qué necesitas hoy?</p>
                 </section>
-                <div class="quick-actions" style="margin-bottom: 25px;">
+                <div class="quick-actions" style="margin-bottom: 20px;">
                     <a href="#" class="action-card taxi" onclick="navigate('taxi')">
                         <i class="fas fa-taxi"></i>
                         <span>Pide un Taxi</span>
@@ -144,15 +141,15 @@ function renderView(view, container) {
                         <h2>Guía Comercial</h2>
                         <a href="#" class="see-all" onclick="navigate('guide')">Ver todo</a>
                     </div>
-                    <div class="scroll-row" id="home-guide-list" style="margin-bottom: 10px;">
-                        <div style="padding: 20px; color: var(--text-dim); font-size: 14px;">Sincronizando Goopi Hub...</div>
+                    <div class="scroll-row" id="home-guide-list">
+                        <div style="padding: 20px; color: var(--text-dim); font-size: 14px;">Cargando locales...</div>
                     </div>
                 </section>
                 
                 <!-- PUBLICIDAD EN HOME (Parte Media) -->
-                ${generateNativeAdHtml("150px", "home-mid")}
+                ${generateNativeAdHtml("75px", "home-mid")}
 
-                <section class="categories" style="margin-top: 20px;">
+                <section class="categories" style="margin-top: 15px;">
                     <div class="section-header">
                         <h2>Categorías</h2>
                     </div>
@@ -161,7 +158,7 @@ function renderView(view, container) {
                     </div>
                 </section>
 
-                <section class="units-area" style="margin-top: 25px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px;">
+                <section class="units-area" style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
                     <button onclick="window.location.href='https://goopiapp.com/registro-de-taxistas/'" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                         <i class="fas fa-id-card"></i> Registro de Unidades
                     </button>
@@ -171,9 +168,9 @@ function renderView(view, container) {
                 </section>
 
                 <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
-                <div style="margin-bottom: 60px;">
-                    <p style="color: var(--text-dim); font-size: 11px; margin-bottom: 8px; text-align: center;">Publicidad Destacada</p>
-                    ${generateNativeAdHtml("150px", "home-bot")}
+                <div style="margin-bottom: 70px; margin-top: 20px;">
+                    <p style="color: var(--text-dim); font-size: 10px; margin-bottom: 5px; text-align: center;">Publicidad Destacada</p>
+                    ${generateNativeAdHtml("75px", "home-bot")}
                 </div>
             `;
             initHomePage();
@@ -190,7 +187,7 @@ function renderView(view, container) {
                     
                     <!-- BANNER NATIVO FLOTANTE (Superior) -->
                     <div style="position: absolute; top: 85px; left: 15px; right: 15px; z-index: 1001;">
-                        ${generateNativeAdHtml("120px", "map-top")}
+                        ${generateNativeAdHtml("70px", "map-top")}
                     </div>
 
                     <!-- MAPA FONDO -->
@@ -339,7 +336,7 @@ async function fetchHomeCategories() {
                 </button>
             `).join('');
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error categories:", e); }
 }
 
 async function fetchHomeGuide() {
@@ -357,7 +354,7 @@ async function fetchHomeGuide() {
                 </div>
             `).join('');
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error posts:", e); }
 }
 
 async function fetchCategories() {
@@ -484,15 +481,12 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
                 .then(reg => {
-                    console.log('Goopi PWA: Service Worker Registered!', reg);
+                    console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
                         const installingWorker = reg.installing;
                         installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed') {
-                                if (navigator.serviceWorker.controller) {
-                                    console.log('Nueva versión disponible. Recargando...');
-                                    window.location.reload();
-                                }
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                window.location.reload();
                             }
                         };
                     };
