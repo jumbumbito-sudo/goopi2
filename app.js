@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v13.0)
- * FIX: Autenticación REAL con Firebase (Login/Registro/Persistencia).
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v14.0 - Recovery)
+ * FIX: Re-estructuración total, Firebase Safe-Init, viewDetails Polymorph.
  */
 
 const wpConfig = {
@@ -9,20 +9,31 @@ const wpConfig = {
     appPassword: "8wHv UbIC nUXg VogE DHcP VSYn"
 };
 
-// Firebase Configuration (v13.0)
-const firebaseConfig = {
-    apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
-    authDomain: "taxi-macas-52717.firebaseapp.com",
-    databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
-    projectId: "taxi-macas-52717",
-    storageBucket: "taxi-macas-52717.firebasestorage.app",
-    messagingSenderId: "206011903079",
-    appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
-};
-
-// Initialize Firebase SDK
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
+// Firebase Safe-Initialization (v14.0)
+let auth = null;
+function initFirebase() {
+    if (typeof firebase !== 'undefined') {
+        const firebaseConfig = {
+            apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
+            authDomain: "taxi-macas-52717.firebaseapp.com",
+            databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
+            projectId: "taxi-macas-52717",
+            storageBucket: "taxi-macas-52717.firebasestorage.app",
+            messagingSenderId: "206011903079",
+            appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        auth = firebase.auth();
+        auth.onAuthStateChanged((user) => {
+            console.log("Goopi Auth:", user ? "Active" : "None");
+            updateHeader();
+        });
+    } else {
+        console.warn("Firebase SDK not loaded yet.");
+    }
+}
 
 const state = {
     currentView: 'home',
@@ -339,14 +350,14 @@ function renderView(view, container, params = null) {
             break;
 
         case 'profile':
-            const user = auth.currentUser;
+            const user = auth ? auth.currentUser : null;
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px;">
                     <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac);">
                         <i class="fas fa-user-astronaut"></i>
                     </div>
                     <h1 style="font-size: 26px; font-weight: 800;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
-                    <p style="color: var(--text-dim);">${user ? user.email : ''}</p>
+                    <p style="color: var(--text-dim);">${user ? user.email : 'Inicia sesión para más funciones'}</p>
                 </div>
                 <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 80px;">
                     <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 20px;">
@@ -357,9 +368,13 @@ function renderView(view, container, params = null) {
                         <span><i class="fas fa-star" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Favoritos</span>
                         <i class="fas fa-chevron-right"></i>
                     </button>
+                    ${user ? `
                     <button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 20px; margin-top: 20px; font-weight: 800;">
                         CERRAR SESIÓN
-                    </button>
+                    </button>` : `
+                    <button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 20px; margin-top: 20px; font-weight: 800;">
+                        INICIAR SESIÓN
+                    </button>`}
                 </div>
             `;
             break;
@@ -390,14 +405,16 @@ async function fetchSearchResults(query) {
     try {
         const response = await fetch(`${wpConfig.url}/wp/v2/posts?search=${query}&_embed`);
         const posts = await response.json();
-
         if (!posts || posts.length === 0) {
             list.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-dim);">No encontramos resultados para "${query}". Intenta con otra palabra.</div>`;
             return;
         }
 
+        // Guardar en cache para que viewDetails funcione
+        state.posts = [...state.posts, ...posts];
+
         list.innerHTML = posts.map(post => `
-            <div class="business-card" onclick='viewDetails(${JSON.stringify(post).replace(/'/g, "&apos;")})'>
+            <div class="business-card" onclick="viewDetails(${post.id})">
                 <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || ''}" alt="${post.title.rendered}">
                 <div class="business-info">
                     <h3>${post.title.rendered}</h3>
@@ -512,9 +529,18 @@ async function fetchNews() {
     } catch (e) { console.error(e); }
 }
 
-function viewDetails(postId) {
-    const post = state.posts.find(p => p.id === postId);
-    if (!post) return;
+function viewDetails(param) {
+    let post;
+    if (typeof param === 'object') {
+        post = param;
+    } else {
+        post = state.posts.find(p => p.id === parseInt(param));
+    }
+
+    if (!post) {
+        console.warn("Post not found:", param);
+        return;
+    }
 
     const whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || '';
     const telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || '';
@@ -522,7 +548,10 @@ function viewDetails(postId) {
     const overlay = document.getElementById('details-overlay');
     const content = document.getElementById('details-content');
 
+    if (!overlay || !content) return;
+
     let buttonsHtml = '';
+    // ... resta del código de botones ...
 
     if (telefono) {
         buttonsHtml += `
@@ -660,8 +689,8 @@ async function handleLogout() {
 }
 
 function updateHeader() {
-    const user = auth.currentUser;
-    const userBtn = document.querySelector('button[onclick="navigate(\'login\')"]');
+    const user = auth ? auth.currentUser : null;
+    const userBtn = document.querySelector('button[onclick*="navigate(\'login\')"], button[onclick*="navigate(\'profile\')"]');
     if (userBtn) {
         if (user) {
             userBtn.setAttribute('onclick', "navigate('profile')");
@@ -693,13 +722,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    initFirebase();
     renderView('home', mainContent);
-
-    // Listener de estado de autenticación REAL de Firebase
-    auth.onAuthStateChanged((user) => {
-        console.log("Auth State Changed:", user ? "LoggedIn" : "LoggedOut");
-        updateHeader();
-    });
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
