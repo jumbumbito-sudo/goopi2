@@ -1,5 +1,5 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.5)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.6)
  */
 
 const wpConfig = {
@@ -14,6 +14,13 @@ const state = {
 };
 
 const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
+
+// URLs Directas de los Banners (Extraídas de goopiapp.com/publicidad/)
+const adImages = [
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/09/iccan.png",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/11/Screenshot_20241113-111000_1-scaled.jpg",
+    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2024/07/adam-travel.png"
+];
 
 const categoryIcons = {
     'gastronomia': 'fa-utensils',
@@ -39,13 +46,31 @@ function getCategoryIcon(name) {
     return categoryIcons['default'];
 }
 
-// Generador de Banner Rotativo (Corte preciso de la página /publicidad/)
-function generateBannerHtml(height = "150px", marginTop = "0px") {
+// Generador de Carrusel Nativo (Más estable que iframes)
+function generateNativeAdHtml(height = "160px", idPrefix = "ad") {
+    const uniqueId = `ad-img-${idPrefix}`;
+
+    // Script para rotar las imágenes localmente
+    setTimeout(() => {
+        const img = document.getElementById(uniqueId);
+        if (img) {
+            let currentIndex = 0;
+            setInterval(() => {
+                currentIndex = (currentIndex + 1) % adImages.length;
+                img.style.opacity = '0';
+                setTimeout(() => {
+                    img.src = adImages[currentIndex];
+                    img.style.opacity = '1';
+                }, 500);
+            }, 5000);
+        }
+    }, 100);
+
     return `
-        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; margin-top: ${marginTop}; box-shadow: 0 5px 15px rgba(0,0,0,0.3); border: 2px solid var(--secondary-lilac);">
-            <iframe src="https://goopiapp.com/publicidad/" 
-                    style="width: 100%; height: 600px; border: none; position: absolute; top: -335px; left: 0;">
-            </iframe>
+        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); border: 2px solid var(--secondary-lilac); display: flex; align-items: center; justify-content: center;">
+            <img id="${uniqueId}" src="${adImages[0]}" 
+                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.5s ease-in-out;">
+            <div style="position: absolute; top: 5px; right: 10px; background: rgba(0,0,0,0.5); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px;">AD</div>
         </div>
     `;
 }
@@ -102,7 +127,7 @@ function renderView(view, container) {
                     <h1 style="text-shadow: 0 0 10px var(--secondary-lilac);">¡Hola, Gooper!</h1>
                     <p>¿Qué necesitas hoy?</p>
                 </section>
-                <div class="quick-actions">
+                <div class="quick-actions" style="margin-bottom: 25px;">
                     <a href="#" class="action-card taxi" onclick="navigate('taxi')">
                         <i class="fas fa-taxi"></i>
                         <span>Pide un Taxi</span>
@@ -112,22 +137,23 @@ function renderView(view, container) {
                         <span>Delivery</span>
                     </a>
                 </div>
-                <section class="guide-preview" style="margin-top: 20px;">
+                
+                <section class="guide-preview">
                     <div class="section-header">
                         <h2>Guía Comercial</h2>
                         <a href="#" class="see-all" onclick="navigate('guide')">Ver todo</a>
                     </div>
-                    <div class="scroll-row" id="home-guide-list">
+                    <div class="scroll-row" id="home-guide-list" style="margin-bottom: 10px;">
                         <div style="padding: 20px; color: var(--text-dim); font-size: 14px;">Sincronizando Goopi Hub...</div>
                     </div>
                 </section>
                 
-                <!-- PUBLICIDAD EN HOME (Parte Media) -->
-                <div style="margin-top: 25px;">
-                    ${generateBannerHtml("140px")}
+                <!-- BANNERS NATIVOS EN HOME (Parte Media) -->
+                <div style="margin: 20px 0;">
+                    ${generateNativeAdHtml("150px", "home-mid")}
                 </div>
 
-                <section class="categories" style="margin-top: 30px; margin-bottom: 20px;">
+                <section class="categories" style="margin-top: 20px;">
                     <div class="section-header">
                         <h2>Categorías</h2>
                     </div>
@@ -145,10 +171,10 @@ function renderView(view, container) {
                     </button>
                 </section>
 
-                <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
-                <div style="margin-top: 10px; margin-bottom: 40px;">
+                <!-- BANNERS NATIVOS EN HOME (Final) -->
+                <div style="margin-top: 10px; margin-bottom: 50px;">
                     <p style="color: var(--text-dim); font-size: 11px; margin-bottom: 8px; text-align: center;">Publicidad Destacada</p>
-                    ${generateBannerHtml("140px")}
+                    ${generateNativeAdHtml("150px", "home-bot")}
                 </div>
             `;
             initHomePage();
@@ -163,9 +189,9 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- BANNER FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 85px; left: 10px; right: 10px; z-index: 1001;">
-                        ${generateBannerHtml("130px")}
+                    <!-- BANNER NATIVO FLOTANTE (Superior) -->
+                    <div style="position: absolute; top: 85px; left: 15px; right: 15px; z-index: 1001;">
+                        ${generateNativeAdHtml("120px", "map-top")}
                     </div>
 
                     <!-- MAPA FONDO -->
