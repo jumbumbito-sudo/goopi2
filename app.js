@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v19.0)
- * FIX: Error de referencia 'null' en Auth, Re-init automático.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v20.0)
+ * FIX: Diagnóstico de Firebase, Fallback de carga y UX de Auth crítica.
  */
 
 const wpConfig = {
@@ -9,36 +9,46 @@ const wpConfig = {
     appPassword: "8wHv UbIC nUXg VogE DHcP VSYn"
 };
 
-// Firebase Safe-Initialization (v16.0)
+// Firebase Safe-Initialization (v20.0)
 let auth = null;
 let db = null;
+let firebaseError = false;
+
 function initFirebase() {
+    console.log("Iniciando Firebase Check...");
     if (typeof firebase !== 'undefined') {
-        const firebaseConfig = {
-            apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
-            authDomain: "taxi-macas-52717.firebaseapp.com",
-            databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
-            projectId: "taxi-macas-52717",
-            storageBucket: "taxi-macas-52717.firebasestorage.app",
-            messagingSenderId: "206011903079",
-            appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
-        };
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        auth = firebase.auth();
-        db = firebase.database();
-        auth.onAuthStateChanged((user) => {
-            console.log("Goopi Auth:", user ? "Active" : "None");
-            if (user) {
-                syncFavorites(user.uid);
-            } else {
-                state.userFavorites = {};
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
+                authDomain: "taxi-macas-52717.firebaseapp.com",
+                databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
+                projectId: "taxi-macas-52717",
+                storageBucket: "taxi-macas-52717.firebasestorage.app",
+                messagingSenderId: "206011903079",
+                appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
+            };
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
             }
-            updateHeader();
-        });
+            auth = firebase.auth();
+            db = firebase.database();
+            auth.onAuthStateChanged((user) => {
+                console.log("Goopi Auth State:", user ? "User Logged In" : "No User");
+                if (user) {
+                    syncFavorites(user.uid);
+                } else {
+                    state.userFavorites = {};
+                }
+                updateHeader();
+            });
+            firebaseError = false;
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+            firebaseError = true;
+        }
     } else {
-        console.warn("Firebase SDK not loaded yet.");
+        console.error("Firebase SDK NO encontrado en el navegador.");
+        firebaseError = true;
     }
 }
 
@@ -674,7 +684,11 @@ function closeDetails() {
 async function handleLogin() {
     if (!auth) initFirebase();
     if (!auth) {
-        alert("El sistema de usuarios aún se está cargando. Por favor, espera un segundo y reintenta.");
+        if (firebaseError) {
+            alert("Error crítico: El motor de cuentas Goopi no se pudo cargar. Revisa que no tengas bloqueadores de publicidad o intenta desde otro navegador.");
+        } else {
+            alert("Cargando servidores... Dale un segundo y pulsa de nuevo.");
+        }
         return;
     }
     const email = document.getElementById('login-email').value;
@@ -724,7 +738,11 @@ async function handleResetPassword() {
 async function handleRegister() {
     if (!auth) initFirebase();
     if (!auth) {
-        alert("El sistema de usuarios aún se está cargando o hubo un error de conexión al servidor de cuentas. Por favor, refresca la página.");
+        if (firebaseError) {
+            alert("No podemos conectar con el registro. Puede que tu conexión esté bloqueando los servicios de Google (Firebase). Intenta usar tus datos móviles o refresca.");
+        } else {
+            alert("Iniciando motor de cuentas... Pulsa una vez más.");
+        }
         return;
     }
     const name = document.getElementById('reg-name').value;
