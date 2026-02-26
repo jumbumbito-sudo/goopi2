@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v25.0)
- * FIX: CDN Cloudflare, MODO EMULADOR para pruebas sin conexión.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v27.0)
+ * FIX: Participación en Sorteos corregida y Logout Asíncrono.
  */
 
 const wpConfig = {
@@ -425,6 +425,49 @@ function renderView(view, container, params = null) {
             `;
             break;
 
+        case 'sorteos':
+            container.innerHTML = `
+                <section class="hero" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #432e00; margin: -20px -20px 25px; padding: 40px 20px; border-radius: 0 0 40px 40px; box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);">
+                    <h1 style="color: #432e00;">Sorteos Goopi</h1>
+                    <p style="opacity: 0.9;">¡Participa y gana premios increíbles!</p>
+                </section>
+
+                <div style="display: flex; flex-direction: column; gap: 20px; padding-bottom: 100px;">
+                    <!-- SORTEO 1 -->
+                    <div class="action-card" style="width: 100%; height: auto; padding: 0; overflow: hidden; background: var(--card-bg); border: 1px solid var(--glass-border); flex-direction: column; align-items: stretch;">
+                        <img src="https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/1.png?w=600" style="width: 100%; height: 200px; object-fit: cover;">
+                        <div style="padding: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="background: #ff4b2b; color: white; font-size: 10px; padding: 4px 10px; border-radius: 20px; font-weight: 800;">QUEDAN 2 DÍAS</span>
+                                <span style="color: var(--text-dim); font-size: 11px;"><i class="fas fa-users"></i> 142 Participantes</span>
+                            </div>
+                            <h2 style="font-size: 20px; color: var(--secondary-lilac); margin-bottom: 10px;">Cena Romántica para 2</h2>
+                            <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 20px;">Participa por una cena todo incluido en los mejores restaurantes aliados de Goopi.</p>
+                            <button onclick="participarSorteo('Cena Romántica')" class="action-card" style="width: 100%; background: linear-gradient(135deg, #FFD700, #FFA500); color: #432e00; border: none; justify-content: center; font-weight: 800; padding: 15px;">
+                                <i class="fas fa-ticket-alt"></i> OBTENER TICKET GRATIS
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SORTEO 2 -->
+                    <div class="action-card" style="width: 100%; height: auto; padding: 0; overflow: hidden; background: var(--card-bg); border: 1px solid var(--glass-border); flex-direction: column; align-items: stretch;">
+                        <img src="https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/2.png?w=600" style="width: 100%; height: 200px; object-fit: cover;">
+                        <div style="padding: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="background: var(--secondary-lilac); color: white; font-size: 10px; padding: 4px 10px; border-radius: 20px; font-weight: 800;">SORTEO EL DOMINGO</span>
+                                <span style="color: var(--text-dim); font-size: 11px;"><i class="fas fa-users"></i> 89 Participantes</span>
+                            </div>
+                            <h2 style="font-size: 20px; color: var(--secondary-lilac); margin-bottom: 10px;">Vale de $50 en Compras</h2>
+                            <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 20px;">Canjeable en cualquier local certificado de la red Goopi App.</p>
+                            <button onclick="participarSorteo('Vale Compra $50')" class="action-card" style="width: 100%; background: linear-gradient(135deg, #FFD700, #FFA500); color: #432e00; border: none; justify-content: center; font-weight: 800; padding: 15px;">
+                                <i class="fas fa-ticket-alt"></i> OBTENER TICKET GRATIS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+
         case 'profile':
             const user = auth ? auth.currentUser : null;
             const favIds = Object.keys(state.userFavorites);
@@ -463,6 +506,17 @@ function renderView(view, container, params = null) {
                     ${favoritesHtml}
 
                     <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 10px;">
+                        <button onclick="navigate('mensajes')" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 18px; position: relative; overflow: hidden;">
+                            <span>
+                                <i class="fas fa-comment-dots" style="margin-right: 12px; color: var(--secondary-lilac); font-size: 18px;"></i> 
+                                <span style="font-weight: 700;">Mensajería Central</span>
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="background: #ff4b2b; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 800;">2 NUEVOS</span>
+                                <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+                            </div>
+                        </button>
+
                         <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 15px;">
                             <span><i class="fas fa-history" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Mis Viajes (Próximamente)</span>
                             <i class="fas fa-chevron-right"></i>
@@ -475,6 +529,38 @@ function renderView(view, container, params = null) {
                         <button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">
                             INICIAR SESIÓN
                         </button>`}
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'mensajes':
+            container.innerHTML = `
+                <section class="hero">
+                    <h1>Mensajes</h1>
+                    <p>Conversaciones con locales y soporte</p>
+                </section>
+                <div style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 100px;">
+                    <div class="action-card" style="width: 100%; padding: 15px; background: var(--card-bg); border: 1px solid var(--glass-border); flex-direction: row; align-items: center; gap: 15px;" onclick="alert('Iniciando chat con soporte...')">
+                        <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--secondary-lilac); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                            <i class="fas fa-headset"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0; font-size: 16px;">Soporte Goopi</h3>
+                            <p style="margin: 3px 0 0; font-size: 12px; color: var(--secondary-cyan);">En línea ahora</p>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: var(--text-dim);"></i>
+                    </div>
+
+                    <div class="action-card" style="width: 100%; padding: 15px; background: var(--card-bg); border: 1px solid var(--glass-border); flex-direction: row; align-items: center; gap: 15px;" onclick="alert('Iniciando chat con restaurante...')">
+                        <div style="width: 50px; height: 50px; border-radius: 50%; background: #555; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0; font-size: 16px;">Restaurante "El Sazón"</h3>
+                            <p style="margin: 3px 0 0; font-size: 12px; color: var(--text-dim);">¿Cómo va mi pedido?</p>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: var(--text-dim);"></i>
                     </div>
                 </div>
             `;
@@ -843,6 +929,15 @@ function toggleFavorite(postId) {
             timestamp: Date.now()
         });
     }
+}
+
+function participarSorteo(premio) {
+    if (!auth || !auth.currentUser) {
+        alert("¡Casi lo logras! Pero necesitas una cuenta para participar.");
+        navigate('login');
+        return;
+    }
+    alert(`¡Genial! Tu ticket para el sorteo "${premio}" ha sido generado. \n\nTe avisaremos por notificación si resultas ganador.`);
 }
 
 async function handleLogout() {
