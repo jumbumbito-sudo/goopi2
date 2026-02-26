@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v11.0)
- * FIX: Login/Registro real con WordPress API y persistencia de sesión.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v12.0)
+ * FIX: Búsqueda interna, Navegación con parámetros y Logo Force-Time.
  */
 
 const wpConfig = {
@@ -14,7 +14,8 @@ const state = {
     posts: [] // Cache for details
 };
 
-const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?v=10.0";
+// Logo con timestamp dinámico para forzar actualización inmediata
+const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?t=" + new Date().getTime();
 
 // URLs de Banners (Optimización Photon CDN para evitar bloqueos y caché)
 const adImages = [
@@ -80,8 +81,11 @@ function generateNativeAdHtml(heightIgnored = "", idPrefix = "slot") {
     `;
 }
 
-function navigate(view) {
+function navigate(view, params = null) {
     console.log(`Navigating to: ${view}`);
+    const mainContent = document.querySelector('.main-content');
+    const header = document.querySelector('.app-header');
+    window.scrollTo(0, 0);
 
     const navItems = document.querySelectorAll('.bottom-nav .nav-item');
     navItems.forEach(item => {
@@ -94,9 +98,6 @@ function navigate(view) {
             }
         }
     });
-
-    const header = document.querySelector('.app-header');
-    const mainContent = document.querySelector('.main-content');
 
     if (view === 'taxi' || view === 'delivery') {
         header.style.display = 'none';
@@ -114,14 +115,14 @@ function navigate(view) {
 
     mainContent.style.opacity = '0';
     setTimeout(() => {
-        renderView(view, mainContent);
+        renderView(view, mainContent, params);
         mainContent.style.opacity = '1';
     }, 100);
 
     state.currentView = view;
 }
 
-function renderView(view, container) {
+function renderView(view, container, params = null) {
     switch (view) {
         case 'home':
             container.innerHTML = `
@@ -348,8 +349,52 @@ function renderView(view, container) {
             `;
             break;
 
+        case 'search':
+            container.innerHTML = `
+                <section class="hero">
+                    <h1>Resultados</h1>
+                    <p>Buscando: "${params}"</p>
+                </section>
+                <div id="search-results-list" style="display: flex; flex-direction: column; gap: 18px; margin-top: 20px; padding-bottom: 80px;">
+                    <div style="padding: 40px; text-align: center; color: var(--text-dim);">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 30px; margin-bottom: 15px; color: var(--secondary-lilac);"></i>
+                        <p>Analizando la red Goopi...</p>
+                    </div>
+                </div>
+            `;
+            fetchSearchResults(params);
+            break;
+
         default:
             break;
+    }
+}
+
+async function fetchSearchResults(query) {
+    const list = document.getElementById('search-results-list');
+    try {
+        const response = await fetch(`${wpConfig.url}/wp/v2/posts?search=${query}&_embed`);
+        const posts = await response.json();
+
+        if (!posts || posts.length === 0) {
+            list.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-dim);">No encontramos resultados para "${query}". Intenta con otra palabra.</div>`;
+            return;
+        }
+
+        list.innerHTML = posts.map(post => `
+            <div class="business-card" onclick='viewDetails(${JSON.stringify(post).replace(/'/g, "&apos;")})'>
+                <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || ''}" alt="${post.title.rendered}">
+                <div class="business-info">
+                    <h3>${post.title.rendered}</h3>
+                    <p>${post.excerpt.rendered.replace(/<[^>]*>/g, '').substring(0, 80)}...</p>
+                    <div class="business-meta">
+                        <span><i class="fas fa-search"></i> Ver detalle</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        list.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-dim);">Error en la búsqueda. Revisa tu conexión.</div>`;
     }
 }
 
@@ -620,14 +665,13 @@ function socialLogin(provider) {
 document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.querySelector('.main-content');
 
-    // Configurar botón de búsqueda
+    // Configurar botón de búsqueda (Búsqueda interna v12.0)
     const sBtn = document.getElementById('searchBtn');
     if (sBtn) {
         sBtn.addEventListener('click', () => {
-            const query = prompt("¿Qué estás buscando?");
-            if (query) {
-                // Redirigir a la búsqueda real en la web para mejores resultados de WordPress
-                window.location.href = `https://goopiapp.com/?s=${encodeURIComponent(query)}`;
+            const query = prompt("¿Qué estás buscando en Goopi?");
+            if (query && query.trim() !== "") {
+                navigate('search', query.trim());
             }
         });
     }
