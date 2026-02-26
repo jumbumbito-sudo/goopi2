@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v14.0 - Recovery)
- * FIX: Re-estructuración total, Firebase Safe-Init, viewDetails Polymorph.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v16.0)
+ * FEATURE: Sistema de Favoritos sincronizado con Firebase Database.
  */
 
 const wpConfig = {
@@ -9,8 +9,9 @@ const wpConfig = {
     appPassword: "8wHv UbIC nUXg VogE DHcP VSYn"
 };
 
-// Firebase Safe-Initialization (v14.0)
+// Firebase Safe-Initialization (v16.0)
 let auth = null;
+let db = null;
 function initFirebase() {
     if (typeof firebase !== 'undefined') {
         const firebaseConfig = {
@@ -26,8 +27,14 @@ function initFirebase() {
             firebase.initializeApp(firebaseConfig);
         }
         auth = firebase.auth();
+        db = firebase.database();
         auth.onAuthStateChanged((user) => {
             console.log("Goopi Auth:", user ? "Active" : "None");
+            if (user) {
+                syncFavorites(user.uid);
+            } else {
+                state.userFavorites = {};
+            }
             updateHeader();
         });
     } else {
@@ -35,9 +42,21 @@ function initFirebase() {
     }
 }
 
+function syncFavorites(uid) {
+    const favRef = db.ref('favorites/' + uid);
+    favRef.on('value', (snapshot) => {
+        state.userFavorites = snapshot.val() || {};
+        if (state.currentView === 'profile') {
+            const mainContent = document.querySelector('.main-content');
+            renderView('profile', mainContent);
+        }
+    });
+}
+
 const state = {
     currentView: 'home',
-    posts: [] // Cache for details
+    posts: [], // Cache for details
+    userFavorites: {}
 };
 
 // Logo con timestamp dinámico para forzar actualización inmediata
@@ -281,6 +300,10 @@ function renderView(view, container, params = null) {
                     <button id="login-btn" onclick="handleLogin()" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4); border-radius: 18px; cursor: pointer;">
                         ENTRAR AHORA
                     </button>
+
+                    <div style="text-align: right; margin-top: 5px;">
+                        <a href="#" onclick="handleResetPassword()" style="color: var(--text-dim); font-size: 12px; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+                    </div>
                     
                     <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
                         <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
@@ -351,6 +374,25 @@ function renderView(view, container, params = null) {
 
         case 'profile':
             const user = auth ? auth.currentUser : null;
+            const favIds = Object.keys(state.userFavorites);
+
+            let favoritesHtml = `<div style="padding: 20px; text-align: center; color: var(--text-dim);">Aún no tienes favoritos.</div>`;
+
+            if (favIds.length > 0) {
+                favoritesHtml = favIds.map(id => {
+                    const fav = state.userFavorites[id];
+                    return `
+                        <div class="business-card" style="display: flex; gap: 15px; align-items: center; padding: 15px; margin-bottom: 10px;" onclick="viewDetails(${fav.id})">
+                            <img src="${fav.image || 'https://via.placeholder.com/100'}" style="width: 50px; height: 50px; border-radius: 10px; object-fit: cover;">
+                            <div style="flex: 1;">
+                                <h3 style="margin: 0; font-size: 14px;">${fav.title}</h3>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: var(--secondary-lilac); font-size: 12px;"></i>
+                        </div>
+                    `;
+                }).join('');
+            }
+
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px;">
                     <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac);">
@@ -359,22 +401,28 @@ function renderView(view, container, params = null) {
                     <h1 style="font-size: 26px; font-weight: 800;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
                     <p style="color: var(--text-dim);">${user ? user.email : 'Inicia sesión para más funciones'}</p>
                 </div>
-                <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 80px;">
-                    <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 20px;">
-                        <span><i class="fas fa-history" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Mis Viajes</span>
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                    <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 20px;">
-                        <span><i class="fas fa-star" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Favoritos</span>
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                    ${user ? `
-                    <button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 20px; margin-top: 20px; font-weight: 800;">
-                        CERRAR SESIÓN
-                    </button>` : `
-                    <button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 20px; margin-top: 20px; font-weight: 800;">
-                        INICIAR SESIÓN
-                    </button>`}
+                
+                <div style="margin-top: 40px; padding-bottom: 100px;">
+                    <div class="section-header">
+                        <h2>Tus Favoritos</h2>
+                        <span style="font-size: 12px; color: var(--secondary-lilac);">${favIds.length} guardados</span>
+                    </div>
+                    ${favoritesHtml}
+
+                    <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 10px;">
+                        <button class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: white; flex-direction: row; justify-content: space-between; padding: 15px;">
+                            <span><i class="fas fa-history" style="margin-right: 10px; color: var(--secondary-lilac);"></i> Mis Viajes (Próximamente)</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        
+                        ${user ? `
+                        <button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">
+                            CERRAR SESIÓN
+                        </button>` : `
+                        <button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">
+                            INICIAR SESIÓN
+                        </button>`}
+                    </div>
                 </div>
             `;
             break;
@@ -551,7 +599,6 @@ function viewDetails(param) {
     if (!overlay || !content) return;
 
     let buttonsHtml = '';
-    // ... resta del código de botones ...
 
     if (telefono) {
         buttonsHtml += `
@@ -592,8 +639,16 @@ function viewDetails(param) {
         `;
     }
 
+    const isFav = state.userFavorites[post.id];
+
     content.innerHTML = `
-        <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || ''}" style="width: 100%; border-radius: 24px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="position: relative;">
+            <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || ''}" style="width: 100%; border-radius: 24px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <button onclick="toggleFavorite(${post.id}); viewDetails(${post.id})" 
+                style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); border: 1px solid var(--glass-border); color: ${isFav ? '#ff4b2b' : 'white'}; width: 50px; height: 50px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px; transition: 0.3s;">
+                <i class="${isFav ? 'fas' : 'far'} fa-heart"></i>
+            </button>
+        </div>
         <h1 style="font-size: 28px; margin-bottom: 10px; color: var(--secondary-lilac); font-weight: 900;">${post.title.rendered}</h1>
         <div style="color: var(--text-dim); margin-bottom: 25px; line-height: 1.8; font-size: 15px;">
             ${post.content.rendered}
@@ -633,10 +688,26 @@ async function handleLogin() {
         console.error("Login Error:", e);
         if (e.code === 'auth/user-not-found') alert("Usuario no encontrado.");
         else if (e.code === 'auth/wrong-password') alert("Contraseña incorrecta.");
-        else alert("Error al iniciar sesión: " + e.message);
+        else if (e.code === 'auth/invalid-email') alert("Correo electrónico inválido.");
+        else alert("Error: " + e.message);
     } finally {
         btn.innerHTML = 'ENTRAR AHORA';
         btn.disabled = false;
+    }
+}
+
+async function handleResetPassword() {
+    const email = document.getElementById('login-email').value;
+    if (!email) {
+        alert("Escribe tu correo en el campo de arriba para enviarte un enlace de recuperación.");
+        return;
+    }
+
+    try {
+        await auth.sendPasswordResetEmail(email);
+        alert("Se ha enviado un correo de recuperación a " + email);
+    } catch (e) {
+        alert("Error: " + e.message);
     }
 }
 
@@ -675,6 +746,31 @@ async function handleRegister() {
     } finally {
         btn.innerHTML = 'CREAR MI CUENTA';
         btn.disabled = false;
+    }
+}
+
+function toggleFavorite(postId) {
+    if (!auth || !auth.currentUser) {
+        alert("Debes iniciar sesión para usar los favoritos.");
+        navigate('login');
+        return;
+    }
+
+    const post = state.posts.find(p => p.id === postId);
+    if (!post) return;
+
+    const user = auth.currentUser;
+    const favRef = db.ref(`favorites/${user.uid}/${postId}`);
+
+    if (state.userFavorites[postId]) {
+        favRef.remove();
+    } else {
+        favRef.set({
+            id: post.id,
+            title: post.title.rendered,
+            image: post._embedded?.['wp:featuredmedia']?.[0]?.source_url || '',
+            timestamp: Date.now()
+        });
     }
 }
 
