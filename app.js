@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v18.0)
- * FIX: Reubicación de botón de registro para máxima visibilidad.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v19.0)
+ * FIX: Error de referencia 'null' en Auth, Re-init automático.
  */
 
 const wpConfig = {
@@ -672,6 +672,11 @@ function closeDetails() {
 }
 
 async function handleLogin() {
+    if (!auth) initFirebase();
+    if (!auth) {
+        alert("El sistema de usuarios aún se está cargando. Por favor, espera un segundo y reintenta.");
+        return;
+    }
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
     const btn = document.getElementById('login-btn');
@@ -717,6 +722,11 @@ async function handleResetPassword() {
 }
 
 async function handleRegister() {
+    if (!auth) initFirebase();
+    if (!auth) {
+        alert("El sistema de usuarios aún se está cargando o hubo un error de conexión al servidor de cuentas. Por favor, refresca la página.");
+        return;
+    }
     const name = document.getElementById('reg-name').value;
     const email = document.getElementById('reg-email').value;
     const pass = document.getElementById('reg-pass').value;
