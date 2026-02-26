@@ -1,5 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.7)
+ * FUERZA DE ACTUALIZACIÓN: Se ha aplicado un "Cache Busting" para asegurar que veas los cambios.
  */
 
 const wpConfig = {
@@ -67,7 +68,7 @@ function generateNativeAdHtml(height = "160px", idPrefix = "ad") {
     }, 100);
 
     return `
-        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); border: 2px solid var(--secondary-lilac); display: flex; align-items: center; justify-content: center;">
+        <div style="height: ${height}; width: 100%; background: #fff; overflow: hidden; position: relative; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); border: 2px solid var(--secondary-lilac); display: flex; align-items: center; justify-content: center; margin: 10px 0;">
             <img id="${uniqueId}" src="${adImages[0]}" 
                  style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.5s ease-in-out;">
             <div style="position: absolute; top: 5px; right: 10px; background: rgba(0,0,0,0.5); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px;">AD</div>
@@ -148,10 +149,8 @@ function renderView(view, container) {
                     </div>
                 </section>
                 
-                <!-- BANNERS NATIVOS EN HOME (Parte Media) -->
-                <div style="margin: 20px 0;">
-                    ${generateNativeAdHtml("150px", "home-mid")}
-                </div>
+                <!-- PUBLICIDAD EN HOME (Parte Media) -->
+                ${generateNativeAdHtml("150px", "home-mid")}
 
                 <section class="categories" style="margin-top: 20px;">
                     <div class="section-header">
@@ -171,8 +170,8 @@ function renderView(view, container) {
                     </button>
                 </section>
 
-                <!-- BANNERS NATIVOS EN HOME (Final) -->
-                <div style="margin-top: 10px; margin-bottom: 50px;">
+                <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
+                <div style="margin-bottom: 60px;">
                     <p style="color: var(--text-dim); font-size: 11px; margin-bottom: 8px; text-align: center;">Publicidad Destacada</p>
                     ${generateNativeAdHtml("150px", "home-bot")}
                 </div>
@@ -484,7 +483,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Goopi PWA: Service Worker Registered!', reg))
+                .then(reg => {
+                    console.log('Goopi PWA: Service Worker Registered!', reg);
+                    reg.onupdatefound = () => {
+                        const installingWorker = reg.installing;
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    console.log('Nueva versión disponible. Recargando...');
+                                    window.location.reload();
+                                }
+                            }
+                        };
+                    };
+                })
                 .catch(err => console.log('Goopi PWA: Registration Failed!', err));
         });
     }
