@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v23.0)
- * DEBUG: Sistema de Diagnóstico Auth integrado para resolver persistencia.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v24.0)
+ * FIX: Tercer CDN (jsDelivr), Soporte Incógnito y Guía de Desbloqueo.
  */
 
 const wpConfig = {
@@ -70,8 +70,9 @@ function getAuthStatusHtml() {
             color = "#4cd964";
         }
     }
-    return `<div id="auth-debug" style="font-size: 10px; color: ${color}; margin-bottom: 15px; font-weight: 800; letter-spacing: 1px;">
+    return `<div id="auth-debug" style="font-size: 10px; color: ${color}; margin-bottom: 15px; font-weight: 800; letter-spacing: 1px; line-height: 1.4;">
         <i class="fas fa-signal"></i> ESTADO: ${status}
+        ${status === "🔴 DESCONECTADO" ? `<br><span style="color: var(--text-dim); font-weight: 400; font-size: 9px;">💡 Tip: El modo Incógnito puede bloquear esto. Prueba una pestaña normal.</span>` : ''}
     </div>`;
 }
 
