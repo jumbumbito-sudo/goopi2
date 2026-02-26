@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v24.0)
- * FIX: Tercer CDN (jsDelivr), Soporte Incógnito y Guía de Desbloqueo.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v25.0)
+ * FIX: CDN Cloudflare, MODO EMULADOR para pruebas sin conexión.
  */
 
 const wpConfig = {
@@ -72,8 +72,31 @@ function getAuthStatusHtml() {
     }
     return `<div id="auth-debug" style="font-size: 10px; color: ${color}; margin-bottom: 15px; font-weight: 800; letter-spacing: 1px; line-height: 1.4;">
         <i class="fas fa-signal"></i> ESTADO: ${status}
-        ${status === "🔴 DESCONECTADO" ? `<br><span style="color: var(--text-dim); font-weight: 400; font-size: 9px;">💡 Tip: El modo Incógnito puede bloquear esto. Prueba una pestaña normal.</span>` : ''}
+        ${status === "🔴 DESCONECTADO" ? `
+            <br><span style="color: var(--text-dim); font-weight: 400; font-size: 9px;">Bloqueado por firewall/incógnito.</span>
+            <br><button onclick="enableMockAuth()" style="background: none; border: 1px solid var(--secondary-lilac); color: var(--secondary-lilac); font-size: 8px; padding: 2px 5px; border-radius: 4px; margin-top: 5px; cursor: pointer;">ACTIVAR MODO EMULADOR (PRUEBAS)</button>
+        ` : ''}
     </div>`;
+}
+
+function enableMockAuth() {
+    console.warn("MODO EMULADOR ACTIVADO");
+    auth = {
+        currentUser: {
+            uid: "mock-123",
+            displayName: "Usuario de Pruebas",
+            email: "tester@goopi.app",
+            updateProfile: () => Promise.resolve()
+        },
+        signInWithEmailAndPassword: () => Promise.resolve(),
+        createUserWithEmailAndPassword: () => Promise.resolve({ user: { uid: "mock-123", updateProfile: () => Promise.resolve() } }),
+        signOut: () => { auth = null; initFirebase(); navigate('home'); }
+    };
+    db = {
+        ref: () => ({ set: () => { }, remove: () => { }, on: (evt, cb) => cb({ val: () => ({}) }) })
+    };
+    alert("¡MODO EMULADOR ACTIVO! Ahora puedes probar el Registro y Perfil sin conexión a Firebase.");
+    navigate('home');
 }
 
 const state = {
