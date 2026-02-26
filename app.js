@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v9.1)
- * FIX: Botón Puntos Goopi en lugar de banner inferior.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v10.0)
+ * FIX: Botón Compartir, Búsqueda funcional y Logo Force-Update.
  */
 
 const wpConfig = {
@@ -14,7 +14,7 @@ const state = {
     posts: [] // Cache for details
 };
 
-const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?force-refresh=" + Date.now();
+const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png?v=10.0";
 
 // URLs de Banners (Optimización Photon CDN para evitar bloqueos y caché)
 const adImages = [
@@ -455,8 +455,22 @@ function viewDetails(postId) {
         `;
     }
 
+    // Botón de compartir universal
+    const shareUrl = `https://goopiapp.com/?p=${post.id}`;
+    buttonsHtml += `
+        <button onclick="sharePost('${post.title.rendered.replace(/'/g, "\\'")}', 'Mira este local en Goopi App', '${shareUrl}')" 
+                style="grid-column: span 2; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); padding: 18px; border-radius: 20px; color: white; font-weight: 700; cursor: pointer;">
+            <i class="fas fa-share-alt"></i> Compartir este Local
+        </button>
+    `;
+
     if (!whatsapp && !telefono) {
+        // En caso de plan básico, aún mostramos el botón de compartir
         buttonsHtml = `
+            <button onclick="sharePost('${post.title.rendered.replace(/'/g, "\\'")}', 'Mira este local en Goopi App', '${shareUrl}')" 
+                    style="grid-column: span 2; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); padding: 15px; border-radius: 15px; color: white; font-weight: 700; cursor: pointer; margin-bottom: 10px;">
+                <i class="fas fa-share-alt"></i> Compartir Local
+            </button>
             <div style="grid-column: span 2; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; text-align: center; color: var(--text-dim); font-size: 13px;">
                 <i class="fas fa-info-circle"></i> Contacto no disponible para este plan básico.
             </div>
@@ -478,6 +492,17 @@ function viewDetails(postId) {
     overlay.classList.add('active');
 }
 
+function sharePost(title, text, url) {
+    if (navigator.share) {
+        navigator.share({ title, text, url })
+            .catch(error => console.log('Error sharing:', error));
+    } else {
+        // Fallback: copiar al portapapeles
+        navigator.clipboard.writeText(`${title} - ${url}`);
+        alert('Enlace copiado al portapapeles');
+    }
+}
+
 function closeDetails() {
     document.getElementById('details-overlay').classList.remove('active');
 }
@@ -488,6 +513,19 @@ function socialLogin(provider) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.querySelector('.main-content');
+
+    // Configurar botón de búsqueda
+    const sBtn = document.getElementById('searchBtn');
+    if (sBtn) {
+        sBtn.addEventListener('click', () => {
+            const query = prompt("¿Qué estás buscando?");
+            if (query) {
+                // Redirigir a la búsqueda real en la web para mejores resultados de WordPress
+                window.location.href = `https://goopiapp.com/?s=${encodeURIComponent(query)}`;
+            }
+        });
+    }
+
     renderView('home', mainContent);
 
     // Register Service Worker for PWA
