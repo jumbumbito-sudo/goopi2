@@ -1,6 +1,5 @@
-/**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.8)
- * FIX: Banners con URLs corregidas y altura reducida (75px).
+ * GoopiApp - Core Logic(Tokyo Midnight Pro Edition v6.9)
+    * FIX: Banners 1200x200px con URLs corregidas y cache - busting.
  */
 
 const wpConfig = {
@@ -16,11 +15,11 @@ const state = {
 
 const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
 
-// URLs Directas de los Banners (Corregidas 2026/02)
+// URLs Directas de los Banners (Dimensiones 1200x200px)
 const adImages = [
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/1.png",
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/2.png",
-    "https://i0.wp.com/goopiapp.com/wp-content/uploads/2026/02/3.png"
+    "https://goopiapp.com/wp-content/uploads/2026/02/1.png?v=6.9",
+    "https://goopiapp.com/wp-content/uploads/2026/02/2.png?v=6.9",
+    "https://goopiapp.com/wp-content/uploads/2026/02/3.png?v=6.9"
 ];
 
 const categoryIcons = {
@@ -47,31 +46,35 @@ function getCategoryIcon(name) {
     return categoryIcons['default'];
 }
 
-// Generador de Carrusel Nativo (Más estable que iframes) - Altura Reducida
-function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
-    const uniqueId = `ad-img-${idPrefix}`;
+// Generador de Carrusel Nativo - Dimensiones 1200x200px (Optimizado)
+function generateNativeAdHtml(requestedHeight = "200px", idPrefix = "display") {
+    const uniqueId = `promo-img-${idPrefix}`;
 
-    // Script para rotar las imágenes localmente
+    // Script para rotar las imágenes localmente con mejor manejo de DOM
     setTimeout(() => {
-        const img = document.getElementById(uniqueId);
-        if (img) {
-            let currentIndex = 0;
-            setInterval(() => {
-                currentIndex = (currentIndex + 1) % adImages.length;
-                img.style.opacity = '0';
-                setTimeout(() => {
-                    img.src = adImages[currentIndex];
-                    img.style.opacity = '1';
-                }, 500);
-            }, 6000); // 6 segundos por banner
-        }
-    }, 100);
+        const startRotator = () => {
+            const img = document.getElementById(uniqueId);
+            if (img && !img.dataset.rotatorStarted) {
+                img.dataset.rotatorStarted = "true";
+                let currentIndex = 0;
+                setInterval(() => {
+                    currentIndex = (currentIndex + 1) % adImages.length;
+                    img.style.opacity = '0';
+                    setTimeout(() => {
+                        img.src = adImages[currentIndex];
+                        img.style.opacity = '1';
+                    }, 500);
+                }, 7000); // 7 segundos por banner
+            }
+        };
+        startRotator();
+    }, 500);
 
     return `
-        <div style="height: ${height}; width: 100%; background: #000; overflow: hidden; position: relative; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 12px 0;">
+        <div class="banner-container" style="width: 100%; max-width: 1200px; margin: 15px auto; overflow: hidden; border-radius: 12px; box-shadow: var(--glass-shadow); border: 1px solid var(--glass-border); background: #000; position: relative; aspect-ratio: 1200 / 200; height: auto;">
             <img id="${uniqueId}" src="${adImages[0]}" 
-                 style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.5s ease-in-out;">
-            <div style="position: absolute; top: 4px; right: 8px; background: rgba(0,0,0,0.6); color: white; font-size: 7px; padding: 1px 4px; border-radius: 8px; font-family: sans-serif; letter-spacing: 1px;">ANUNCIO</div>
+                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.6s ease-in-out; display: block; min-height: 60px;">
+            <div style="position: absolute; top: 6px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px; font-family: sans-serif; letter-spacing: 1px; z-index: 10; pointer-events: none;">INFO</div>
         </div>
     `;
 }
@@ -147,7 +150,7 @@ function renderView(view, container) {
                 </section>
                 
                 <!-- PUBLICIDAD EN HOME (Parte Media) -->
-                ${generateNativeAdHtml("75px", "home-mid")}
+                ${generateNativeAdHtml("200px", "home-mid")}
 
                 <section class="categories" style="margin-top: 15px;">
                     <div class="section-header">
@@ -168,9 +171,8 @@ function renderView(view, container) {
                 </section>
 
                 <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
-                <div style="margin-bottom: 70px; margin-top: 20px;">
-                    <p style="color: var(--text-dim); font-size: 10px; margin-bottom: 5px; text-align: center;">Publicidad Destacada</p>
-                    ${generateNativeAdHtml("75px", "home-bot")}
+                <div style="margin-bottom: 70px; margin-top: 25px;">
+                    ${generateNativeAdHtml("200px", "home-bot")}
                 </div>
             `;
             initHomePage();
@@ -186,8 +188,8 @@ function renderView(view, container) {
                     </button>
                     
                     <!-- BANNER NATIVO FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 85px; left: 15px; right: 15px; z-index: 1001;">
-                        ${generateNativeAdHtml("70px", "map-top")}
+                    <div style="position: absolute; top: 75px; left: 10px; right: 10px; z-index: 1001;">
+                        ${generateNativeAdHtml("200px", "map-top")}
                     </div>
 
                     <!-- MAPA FONDO -->
