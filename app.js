@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v8.2)
- * FIX: Ocultar banner web en mapas, posición banner nativo y social login apps.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v8.3)
+ * FIX: Limpieza mapa (ocultar Mapbox/Ads bottom) y banner 50% más arriba.
  */
 
 const wpConfig = {
@@ -184,18 +184,18 @@ function renderView(view, container) {
             container.innerHTML = `
                 <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
                     <!-- BANNER NATIVO FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1001;">
+                    <div style="position: absolute; top: 5px; left: 10px; right: 10px; z-index: 1001;">
                         ${generateNativeAdHtml("", "map-top")}
                     </div>
                     
-                    <!-- Botón Volver (Ajustado) -->
-                    <button onclick="navigate('home')" style="position: absolute; top: 90px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <!-- Botón Volver (Ubicación optimizada) -->
+                    <button onclick="navigate('home')" style="position: absolute; top: 85px; left: 15px; z-index: 2000; background: rgba(0,0,0,0.85); border: 1px solid var(--glass-border); color: white; width: 42px; height: 42px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-arrow-left"></i>
                     </button>
 
-                    <!-- MAPA FONDO (Ocultando banner superior de la web con margin-top negativo mayor) -->
+                    <!-- MAPA FONDO (Cápsula de aislamiento para ocultar Banners Web, Mapbox links y Atribución) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 160px); border: none; position: absolute; top: -160px; left: 0;" 
+                            style="width: 100%; height: calc(100% + 250px); border: none; position: absolute; top: -180px; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
