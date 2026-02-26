@@ -1,5 +1,6 @@
- * GoopiApp - Core Logic(Tokyo Midnight Pro Edition v6.9)
-    * FIX: Banners 1200x200px con URLs corregidas y cache - busting.
+/**
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v7.0)
+ * FIX: Banners 450x75px con anti-cache y corrección de visualización.
  */
 
 const wpConfig = {
@@ -46,9 +47,10 @@ function getCategoryIcon(name) {
     return categoryIcons['default'];
 }
 
-// Generador de Carrusel Nativo - Dimensiones 1200x200px (Optimizado)
-function generateNativeAdHtml(requestedHeight = "200px", idPrefix = "display") {
+// Generador de Carrusel Nativo - Dimensiones 450x75px (Relación 6:1)
+function generateNativeAdHtml(requestedHeight = "75px", idPrefix = "display") {
     const uniqueId = `promo-img-${idPrefix}`;
+    const cacheBust = Date.now();
 
     // Script para rotar las imágenes localmente con mejor manejo de DOM
     setTimeout(() => {
@@ -61,7 +63,8 @@ function generateNativeAdHtml(requestedHeight = "200px", idPrefix = "display") {
                     currentIndex = (currentIndex + 1) % adImages.length;
                     img.style.opacity = '0';
                     setTimeout(() => {
-                        img.src = adImages[currentIndex];
+                        // Forzamos recarga con cache busting en cada rotación si es necesario
+                        img.src = adImages[currentIndex] + "&t=" + Date.now();
                         img.style.opacity = '1';
                     }, 500);
                 }, 7000); // 7 segundos por banner
@@ -71,9 +74,10 @@ function generateNativeAdHtml(requestedHeight = "200px", idPrefix = "display") {
     }, 500);
 
     return `
-        <div class="banner-container" style="width: 100%; max-width: 1200px; margin: 15px auto; overflow: hidden; border-radius: 12px; box-shadow: var(--glass-shadow); border: 1px solid var(--glass-border); background: #000; position: relative; aspect-ratio: 1200 / 200; height: auto;">
-            <img id="${uniqueId}" src="${adImages[0]}" 
-                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.6s ease-in-out; display: block; min-height: 60px;">
+        <div class="banner-container" style="width: 100%; max-width: 450px; margin: 15px auto; overflow: hidden; border-radius: 12px; box-shadow: var(--glass-shadow); border: 1px solid var(--glass-border); background: #000; position: relative; aspect-ratio: 450 / 75; height: auto; display: block !important;">
+            <img id="${uniqueId}" src="${adImages[0]}&t=${cacheBust}" 
+                 style="width: 100%; height: 100%; object-fit: contain; transition: opacity 0.6s ease-in-out; display: block; min-height: 50px;"
+                 onerror="this.src='https://via.placeholder.com/450x75?text=Goopi+Publicidad'">
             <div style="position: absolute; top: 6px; right: 10px; background: rgba(0,0,0,0.7); color: white; font-size: 8px; padding: 2px 6px; border-radius: 10px; font-family: sans-serif; letter-spacing: 1px; z-index: 10; pointer-events: none;">INFO</div>
         </div>
     `;
@@ -150,7 +154,7 @@ function renderView(view, container) {
                 </section>
                 
                 <!-- PUBLICIDAD EN HOME (Parte Media) -->
-                ${generateNativeAdHtml("200px", "home-mid")}
+                ${generateNativeAdHtml("75px", "home-mid")}
 
                 <section class="categories" style="margin-top: 15px;">
                     <div class="section-header">
@@ -172,7 +176,7 @@ function renderView(view, container) {
 
                 <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
                 <div style="margin-bottom: 70px; margin-top: 25px;">
-                    ${generateNativeAdHtml("200px", "home-bot")}
+                    ${generateNativeAdHtml("75px", "home-bot")}
                 </div>
             `;
             initHomePage();
@@ -189,7 +193,7 @@ function renderView(view, container) {
                     
                     <!-- BANNER NATIVO FLOTANTE (Superior) -->
                     <div style="position: absolute; top: 75px; left: 10px; right: 10px; z-index: 1001;">
-                        ${generateNativeAdHtml("200px", "map-top")}
+                        ${generateNativeAdHtml("75px", "map-top")}
                     </div>
 
                     <!-- MAPA FONDO -->
