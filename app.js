@@ -1,6 +1,6 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v9.0)
- * FIX: Logo Force-Refresh (Cache-Fix) y posición Banner Mapa Extrema.
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v9.1)
+ * FIX: Botón Puntos Goopi en lugar de banner inferior.
  */
 
 const wpConfig = {
@@ -171,9 +171,16 @@ function renderView(view, container) {
                     </button>
                 </section>
 
-                <!-- PUBLICIDAD EN HOME (Abajo de todo) -->
-                <div style="margin-bottom: 70px; margin-top: 25px;">
-                    ${generateNativeAdHtml("75px", "home-bot")}
+                <!-- SECCIÓN PUNTOS GOOPI (Reemplaza banner inferior) -->
+                <div style="margin-bottom: 90px; margin-top: 30px; padding: 0 5px;">
+                    <button onclick="window.location.href='https://goopiapp.com/puntos-goopi/'" class="action-card" 
+                        style="width: 100%; height: auto; padding: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #432e00; border: none; flex-direction: row; align-items: center; justify-content: center; gap: 15px; border-radius: 20px; box-shadow: 0 10px 25px rgba(255, 215, 0, 0.3); cursor: pointer; transition: 0.3s;">
+                        <i class="fas fa-coins" style="font-size: 24px;"></i>
+                        <div style="text-align: left;">
+                            <span style="display: block; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Puntos Goopi</span>
+                            <span style="display: block; font-size: 10px; font-weight: 400; opacity: 0.8;">Próximamente: Acumula y Canjea</span>
+                        </div>
+                    </button>
                 </div>
             `;
             initHomePage();
