@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.2)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.3)
  */
-console.log("🚀 GOOPIAPP VERSION 32.2 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.3 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -687,7 +687,6 @@ function renderCommunityPosts() {
         `;
         return;
     }
-
     feed.innerHTML = state.communityPosts.map(post => {
         const user = auth ? auth.currentUser : null;
         const liked = post.likes && user && post.likes[user.uid];
@@ -703,20 +702,20 @@ function renderCommunityPosts() {
                 
                 <div class="tiktok-overlay">
                     <div class="tiktok-actions">
-                        <div class="action-item" onclick="handleLike('${post.id}')">
+                        <div class="action-item" onclick="event.stopPropagation(); handleLike('${post.id}')">
                             <i class="fas fa-heart ${liked ? 'liked' : ''}"></i>
                             <span>${likesCount}</span>
                         </div>
-                        <div class="action-item" onclick="showComments('${post.id}')">
+                        <div class="action-item" onclick="event.stopPropagation(); showComments('${post.id}')">
                             <i class="fas fa-comment-dots"></i>
                             <span>${post.comments ? Object.keys(post.comments).length : 0}</span>
                         </div>
-                        <div class="action-item" onclick="sharePost('${post.id}')">
+                        <div class="action-item" onclick="event.stopPropagation(); sharePost('${post.id}')">
                             <i class="fas fa-share"></i>
                         </div>
                     </div>
                     
-                    <div class="tiktok-info">
+                    <div class="tiktok-info" onclick="event.stopPropagation()">
                         <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
