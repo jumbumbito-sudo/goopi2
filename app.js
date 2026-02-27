@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.9)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.0)
  */
-console.log("🚀 GOOPIAPP VERSION 31.9 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.0 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -175,7 +175,7 @@ function navigate(view) {
     } else {
         if (header) header.style.setProperty('display', 'flex', 'important');
         if (nav) nav.style.setProperty('display', 'flex', 'important');
-        mainContent.style.padding = '20px';
+        mainContent.style.padding = '20px 20px 110px 20px'; // Space for bottom nav
         mainContent.style.marginTop = '0';
         mainContent.style.height = 'auto';
         mainContent.style.width = 'auto';
