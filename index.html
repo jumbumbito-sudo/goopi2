@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon"
         href="https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png">
 
-    <link rel="stylesheet" href="style.css?v=35.7">
+    <link rel="stylesheet" href="style.css?v=36.1">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -62,6 +62,25 @@
                     <i class="fas fa-motorcycle"></i>
                     <span>Delivery</span>
                 </a>
+            </div>
+
+            <!-- Goopi Points Button -->
+            <div style="margin: 30px 0 20px;">
+                <button onclick="navigate('profile')" class="points-btn"
+                    style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div
+                            style="background: rgba(255,255,255,0.3); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                            <i class="fas fa-coins text-yellow-400"></i>
+                        </div>
+                        Puntos Goopi
+                    </div>
+                    <div
+                        style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.1); padding: 5px 12px; border-radius: 12px; font-size: 14px;">
+                        <span id="points-display-total">100</span>
+                        <i class="fas fa-chevron-right" style="font-size: 10px; opacity: 0.6;"></i>
+                    </div>
+                </button>
             </div>
 
             <!-- Commercial Guide Carousel -->
@@ -133,7 +152,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=35.7"></script>
+    <script src="app.js?v=36.1"></script>
 </body>
 
 </html>

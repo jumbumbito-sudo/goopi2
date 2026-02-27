@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v35.7)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.1)
  */
-console.log("🚀 GOOPIAPP VERSION 35.7 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.1 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -213,6 +213,22 @@ function renderView(view, container) {
                         <i class="fas fa-motorcycle"></i>
                         <span>Delivery</span>
                     </a>
+                </div>
+                
+                <!-- Goopi Points Button (Home View) -->
+                <div style="margin: 20px 0;">
+                    <button onclick="navigate('profile')" class="points-btn" style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: rgba(255,255,255,0.3); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            Puntos Goopi
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.1); padding: 5px 12px; border-radius: 12px; font-size: 14px;">
+                            <span>${state.userPoints}</span>
+                            <i class="fas fa-chevron-right" style="font-size: 10px; opacity: 0.6;"></i>
+                        </div>
+                    </button>
                 </div>
                 
                 <!-- PUBLICIDAD EN HOME (Justo bajo botones) -->
@@ -560,7 +576,7 @@ function showInfoPopup(page) {
 
     // Intenta obtener la imagen destacada o la primera imagen del contenido
     let imgPath = page._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
-    
+
     // Si no hay imagen destacada, buscamos una etiqueta <img> en el contenido
     if (!imgPath) {
         const tempDiv = document.createElement('div');
@@ -661,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=31.0')
+            navigator.serviceWorker.register('./sw.js?v=36.1')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {

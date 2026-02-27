@@ -1,10 +1,11 @@
-const CACHE_NAME = 'goopi-v35.7';
+const CACHE_NAME = 'goopi-v36.1';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png'
 ];
 
 // Install Service Worker
