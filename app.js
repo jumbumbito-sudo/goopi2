@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.5)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.6)
  */
-console.log("🚀 GOOPIAPP VERSION 33.5 LOADED");
+console.log("🚀 GOOPIAPP VERSION 33.6 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -536,19 +536,13 @@ async function fetchNews() {
 
 async function checkDynamicPopup() {
     try {
-        const response = await fetch(`${wpConfig.url}/wp/v2/pages?slug=publicidad-popup&_embed`);
+        const response = await fetch(`${wpConfig.url}/wp/v2/pages?slug=publicidad-popup&_embed&t=${new Date().getTime()}`);
         const pages = await response.json();
 
         if (pages && pages.length > 0) {
             const page = pages[0];
-            const lastSeenId = localStorage.getItem('last_popup_id');
-            const lastSeenTime = localStorage.getItem('last_popup_time');
-            const now = new Date().getTime();
-
-            // Mostrar si es nuevo ID o si ya pasaron 24 horas
-            if (lastSeenId !== String(page.id) || (now - (parseInt(lastSeenTime) || 0) > 24 * 60 * 60 * 1000)) {
-                showInfoPopup(page);
-            }
+            // Removed 24h check for testing as requested to ensure it stays visible
+            showInfoPopup(page);
         }
     } catch (e) {
         console.error("Popup Error:", e);
