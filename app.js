@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.2)
  */
-console.log("🚀 GOOPIAPP VERSION 36.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.2 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -217,7 +217,7 @@ function renderView(view, container) {
                 
                 <!-- Goopi Points Button (Home View) -->
                 <div style="margin: 20px 0;">
-                    <button onclick="navigate('profile')" class="points-btn" style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
+                    <button onclick="window.location.href='https://goopiapp.com/puntos-goopi/'" class="points-btn" style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="background: rgba(255,255,255,0.3); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
                                 <i class="fas fa-coins"></i>
@@ -677,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.1')
+            navigator.serviceWorker.register('./sw.js?v=36.2')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
