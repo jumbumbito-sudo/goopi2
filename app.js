@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.3)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.4)
  */
-console.log("🚀 GOOPIAPP VERSION 33.3 LOADED");
+console.log("🚀 GOOPIAPP VERSION 33.4 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -286,9 +286,9 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- MAPA FONDO (Subido mucho más para intentar ver publicidad WP en el footer) -->
+                    <!-- MAPA FONDO (Subido +850px y recortado inferior para ocultar Mapbox y mostrar Banner completo) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 750px); border: none; position: absolute; top: -750px; left: 0;" 
+                            style="width: 100%; height: calc(100% + 950px); border: none; position: absolute; top: -850px; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
