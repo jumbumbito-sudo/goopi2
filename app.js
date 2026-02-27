@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.3)
  */
-console.log("🚀 GOOPIAPP VERSION 33.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 33.3 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -14,7 +14,8 @@ const state = {
     posts: [],
     communityPosts: [],
     userFavorites: {},
-    userPoints: 100
+    userPoints: 100,
+    isMuted: true // Start muted for better PWA experience
 };
 
 // Firebase Safe-Initialization
@@ -285,9 +286,9 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- MAPA FONDO (Subido para ver publicidad inferior de WP) -->
+                    <!-- MAPA FONDO (Subido mucho más para intentar ver publicidad WP en el footer) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 150px); border: none; position: absolute; top: -150px; left: 0;" 
+                            style="width: 100%; height: calc(100% + 750px); border: none; position: absolute; top: -750px; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
@@ -693,25 +694,28 @@ function renderCommunityPosts() {
             <div id="post-${post.id}" class="tiktok-post">
                 ${post.mediaUrl ? (
                 post.mediaType === 'video'
-                    ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline onclick="toggleVideo(this)"></video>`
+                    ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
                     : `<img src="${post.mediaUrl}" class="tiktok-media">`
             ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`}
                 
-                <div class="tiktok-overlay">
-                    <div class="tiktok-actions">
-                        <div class="action-item" onclick="event.stopPropagation(); handleLike('${post.id}')">
-                            <i class="fas fa-heart ${liked ? 'liked' : ''}"></i>
-                            <span>${likesCount}</span>
-                        </div>
-                        <div class="action-item" onclick="event.stopPropagation(); showComments('${post.id}')">
-                            <i class="fas fa-comment-dots"></i>
-                            <span>${post.comments ? Object.keys(post.comments).length : 0}</span>
-                        </div>
-                        <div class="action-item" onclick="event.stopPropagation(); sharePost('${post.id}')">
-                            <i class="fas fa-share"></i>
-                        </div>
+                <div class="tiktok-actions">
+                    <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
+                        <i class="fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
                     </div>
-                    
+                    <div class="action-item" onclick="event.stopPropagation(); handleLike('${post.id}')">
+                        <i class="fas fa-heart ${liked ? 'liked' : ''}"></i>
+                        <span>${likesCount}</span>
+                    </div>
+                    <div class="action-item" onclick="event.stopPropagation(); showComments('${post.id}')">
+                        <i class="fas fa-comment-dots"></i>
+                        <span>${post.comments ? Object.keys(post.comments).length : 0}</span>
+                    </div>
+                    <div class="action-item" onclick="event.stopPropagation(); sharePost('${post.id}')">
+                        <i class="fas fa-share"></i>
+                    </div>
+                </div>
+
+                <div class="tiktok-overlay">
                     <div class="tiktok-info" onclick="event.stopPropagation()">
                         <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
                         <div class="post-desc">${post.text || ''}</div>
@@ -739,6 +743,18 @@ function renderCommunityPosts() {
 function toggleVideo(video) {
     if (video.paused) video.play();
     else video.pause();
+}
+
+function toggleMute() {
+    state.isMuted = !state.isMuted;
+    const videos = document.querySelectorAll('video.tiktok-media');
+    videos.forEach(v => v.muted = state.isMuted);
+
+    // Update icons in all action items
+    const muteIcons = document.querySelectorAll('.tiktok-actions .fa-volume-up, .tiktok-actions .fa-volume-mute');
+    muteIcons.forEach(icon => {
+        icon.className = `fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}`;
+    });
 }
 
 async function sharePost(postId) {
