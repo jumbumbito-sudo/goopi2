@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v6.8)
- * FIX: Banners con URLs corregidas y altura reducida (75px).
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.1)
  */
+console.log("🚀 GOOPIAPP VERSION 31.1 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -602,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('./sw.js?v=31.0')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
@@ -621,9 +621,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- COMMUNITY & SOCIAL LOGIC ---
 function initCommunity() {
-    if (!db) return;
+    if (!db) {
+        console.warn("DB not ready, retrying in 1s...");
+        setTimeout(initCommunity, 1000);
+        return;
+    }
+
     const postsRef = db.ref('posts');
     postsRef.on('value', (snapshot) => {
+        console.log("Community data received.");
         const rawPosts = snapshot.val() || {};
         state.communityPosts = Object.keys(rawPosts).map(id => ({
             id,
@@ -636,7 +642,29 @@ function initCommunity() {
             const mainContent = document.querySelector('.main-content');
             renderView('profile', mainContent);
         }
+    }, (error) => {
+        console.error("Social DB Error:", error);
+        if (state.currentView === 'community') {
+            const feed = document.getElementById('community-feed');
+            if (feed) feed.innerHTML = `<div style="padding:40px; text-align:center; color:white;">
+                <i class="fas fa-exclamation-triangle" style="font-size:30px; color:#ff3b30;"></i>
+                <p style="margin-top:15px;">Error de conexión con GoopiSocial.</p>
+                <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Reintentar</button>
+            </div>`;
+        }
     });
+
+    // Timeout if nothing loads in 8 seconds
+    setTimeout(() => {
+        if (state.currentView === 'community' && document.getElementById('community-feed')?.innerText.includes('ENTRANDO')) {
+            const feed = document.getElementById('community-feed');
+            if (feed) feed.innerHTML = `<div style="padding:40px; text-align:center; color:white;">
+                <i class="fas fa-wifi-slash" style="font-size:30px; opacity:0.5;"></i>
+                <p style="margin-top:15px;">Parece que la conexión es lenta...</p>
+                <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Forzar carga</button>
+            </div>`;
+        }
+    }, 8000);
 }
 
 function renderCommunityPosts() {
