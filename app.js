@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.8)
  */
-console.log("🚀 GOOPIAPP VERSION 31.6 LOADED");
+console.log("🚀 GOOPIAPP VERSION 31.8 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -161,17 +161,24 @@ function navigate(view) {
     const mainContent = document.querySelector('.main-content');
 
     if (view === 'taxi' || view === 'delivery' || view === 'community') {
-        header.style.display = 'none';
-        if (nav) nav.style.display = 'none';
+        if (header) header.style.setProperty('display', 'none', 'important');
+        if (nav) nav.style.setProperty('display', 'none', 'important');
         mainContent.style.padding = '0';
         mainContent.style.marginTop = '0';
         mainContent.style.height = '100vh';
         mainContent.style.width = '100vw';
+        mainContent.style.position = 'fixed';
+        mainContent.style.top = '0';
+        mainContent.style.left = '0';
+        mainContent.style.zIndex = '1000';
     } else {
-        header.style.display = 'flex';
-        if (nav) nav.style.display = 'flex';
+        if (header) header.style.setProperty('display', 'flex', 'important');
+        if (nav) nav.style.setProperty('display', 'flex', 'important');
         mainContent.style.padding = '20px';
         mainContent.style.marginTop = '0';
+        mainContent.style.height = 'auto';
+        mainContent.style.position = 'relative';
+        mainContent.style.zIndex = '1';
     }
 
     mainContent.style.opacity = '0';
@@ -244,19 +251,18 @@ function renderView(view, container) {
 
         case 'community':
             container.innerHTML = `
-                <div id="community-feed" class="tiktok-feed">
+                <div id="community-feed" class="tiktok-feed" style="background: #000;">
                     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
-                        <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO REELS...</p>
+                        <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO...</p>
                     </div>
                 </div>
 
-                <!-- Botón Volver (Solo en Social) -->
-                <button onclick="navigate('home')" style="position: fixed; top: 25px; left: 20px; z-index: 6000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                <button onclick="navigate('home')" style="position: fixed; top: 25px; left: 20px; z-index: 9999; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                     <i class="fas fa-arrow-left"></i>
                 </button>
 
-                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 150px !important;">
+                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 30px !important; z-index: 99999 !important;">
                     <i class="fas fa-plus"></i>
                 </button>
             `;
@@ -322,13 +328,13 @@ function renderView(view, container) {
                 <div style="margin-top: 35px; display: flex; flex-direction: column; gap: 15px; padding: 0 10px;">
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-envelope" style="color: var(--secondary-lilac);"></i>
-                        <input type="email" placeholder="Correo electrónico" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
+                        <input type="email" id="login-email" placeholder="Correo electrónico" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
                     </div>
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
-                        <input type="password" placeholder="Contraseña" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
+                        <input type="password" id="login-password" placeholder="Contraseña" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
                     </div>
-                    <button class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4); border-radius: 18px;">
+                    <button onclick="handleEmailLogin(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4); border-radius: 18px;">
                         ENTRAR AHORA
                     </button>
                     
@@ -338,12 +344,9 @@ function renderView(view, container) {
                         <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <button style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Google
-                        </button>
-                        <button style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
-                            <i class="fab fa-facebook-f"></i> Facebook
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+                        <button onclick="handleGoogleLogin()" style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Entrar con Google
                         </button>
                     </div>
 
@@ -363,34 +366,19 @@ function renderView(view, container) {
                 <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 12px; padding: 0 10px;">
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-user" style="color: var(--secondary-lilac);"></i>
-                        <input type="text" placeholder="Nombre completo" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <input type="text" id="reg-name" placeholder="Nombre completo" style="background: none; border: none; color: white; width: 100%; outline: none;">
                     </div>
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-envelope" style="color: var(--secondary-lilac);"></i>
-                        <input type="email" placeholder="Email" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <input type="email" id="reg-email" placeholder="Email" style="background: none; border: none; color: white; width: 100%; outline: none;">
                     </div>
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
-                        <input type="password" placeholder="Define tu contraseña" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <input type="password" id="reg-password" placeholder="Define tu contraseña" style="background: none; border: none; color: white; width: 100%; outline: none;">
                     </div>
-                    <button class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #00f3ff 0%, #00a8b3 100%); color: #00363d; border-radius: 18px;">
+                    <button onclick="handleEmailRegister(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #00f3ff 0%, #00a8b3 100%); color: #00363d; border-radius: 18px;">
                         CREAR MI CUENTA
                     </button>
-
-                    <div style="display: flex; align-items: center; gap: 10px; margin: 15px 0;">
-                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
-                        <span style="color: var(--text-dim); font-size: 11px;">O regístrate con</span>
-                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <button style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Google
-                        </button>
-                        <button style="background: #1877F2; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 600; cursor: pointer;">
-                            <i class="fab fa-facebook-f"></i> Facebook
-                        </button>
-                    </div>
 
                     <div style="text-align: center; margin-top: 20px; padding-bottom: 20px;">
                         <p style="color: var(--text-dim); font-size: 14px;">¿Ya eres parte? <a href="#" onclick="navigate('login')" style="color: var(--secondary-lilac); font-weight: 800; text-decoration: none;">Inicia Sesión</a></p>
@@ -853,4 +841,54 @@ function handleLogout() {
         navigate('home');
         window.location.reload();
     });
+}
+
+// --- AUTH HANDLERS ---
+function handleEmailLogin(btn) {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) return alert("Completa todos los campos");
+
+    btn.disabled = true;
+    btn.innerText = "ENTRANDO...";
+
+    auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+            navigate('home');
+        })
+        .catch(e => {
+            alert("Error: " + e.message);
+            btn.disabled = false;
+            btn.innerText = "ENTRAR AHORA";
+        });
+}
+
+function handleEmailRegister(btn) {
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+
+    if (!name || !email || !password) return alert("Completa todos los campos");
+
+    btn.disabled = true;
+    btn.innerText = "CREANDO...";
+
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((result) => {
+            return result.user.updateProfile({ displayName: name });
+        })
+        .then(() => {
+            navigate('home');
+        })
+        .catch(e => {
+            alert("Error: " + e.message);
+            btn.disabled = false;
+            btn.innerText = "CREAR MI CUENTA";
+        });
+}
+
+function handleGoogleLogin() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithRedirect(provider);
 }
