@@ -188,7 +188,7 @@ function navigate(view, params = null) {
         const textElement = item.querySelector('span');
         if (textElement) {
             const text = textElement.innerText.toLowerCase();
-            if (text.includes(view) || (view === 'home' && text === 'inicio') || (view === 'news' && text === 'noticias') || (view === 'guide' && text === 'guía')) {
+            if (text.includes(view) || (view === 'home' && text === 'inicio') || (view === 'community' && text.includes('social')) || (view === 'guide' && text === 'guía')) {
                 item.classList.add('active');
             }
         }
@@ -288,7 +288,7 @@ function renderView(view, container, params = null) {
                 <div id="community-feed" class="tiktok-feed">
                     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
-                        <p style="font-weight: 700; letter-spacing: 1px;">CARGANDO GOOPI REELS...</p>
+                        <p style="font-weight: 700; letter-spacing: 1px;">ENTRANDO A GOOPISOCIAL...</p>
                     </div>
                 </div>
 
