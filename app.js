@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.6)
  */
-console.log("🚀 GOOPIAPP VERSION 32.4 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.6 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -203,7 +203,7 @@ function renderView(view, container) {
                     <h1 style="text-shadow: 0 0 10px var(--secondary-lilac);">¡Hola, Gooper!</h1>
                     <p>¿Qué necesitas hoy?</p>
                 </section>
-                <div class="quick-actions" style="margin-bottom: 20px;">
+                <div class="quick-actions" style="margin-bottom: 10px;">
                     <a href="#" class="action-card taxi" onclick="navigate('taxi')">
                         <i class="fas fa-taxi"></i>
                         <span>Pide un Taxi</span>
@@ -214,6 +214,11 @@ function renderView(view, container) {
                     </a>
                 </div>
                 
+                <!-- PUBLICIDAD EN HOME (Justo bajo botones) -->
+                <div style="margin-bottom: 20px;">
+                    ${generateNativeAdHtml("75px", "home-mid")}
+                </div>
+
                 <section class="guide-preview">
                     <div class="section-header">
                         <h2>Guía Comercial</h2>
@@ -224,9 +229,6 @@ function renderView(view, container) {
                     </div>
                 </section>
                 
-                <!-- PUBLICIDAD EN HOME (Parte Media) -->
-                ${generateNativeAdHtml("75px", "home-mid")}
-
                 <section class="categories" style="margin-top: 15px;">
                     <div class="section-header">
                         <h2>Categorías</h2>
@@ -283,12 +285,7 @@ function renderView(view, container) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- BANNER NATIVO FLOTANTE (Superior) -->
-                    <div style="position: absolute; top: 85px; left: 15px; right: 15px; z-index: 1001;">
-                        ${generateNativeAdHtml("70px", "map-top")}
-                    </div>
-
-                    <!-- MAPA FONDO -->
+                    <!-- MAPA FONDO (Banner de WP se verá dentro) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
                             style="width: 100%; height: calc(100% + 95px); border: none; position: absolute; top: -95px; left: 0;" 
                             allow="geolocation">
