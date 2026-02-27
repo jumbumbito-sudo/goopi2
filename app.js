@@ -11,8 +11,73 @@ const wpConfig = {
 
 const state = {
     currentView: 'home',
-    posts: [] // Cache for details
+    posts: [],
+    communityPosts: [],
+    userFavorites: {},
+    userPoints: 100
 };
+
+// Firebase Safe-Initialization
+let auth = null;
+let db = null;
+let storage = null;
+let firebaseError = false;
+
+function initFirebase() {
+    if (typeof firebase !== 'undefined') {
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
+                authDomain: "taxi-macas-52717.firebaseapp.com",
+                databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
+                projectId: "taxi-macas-52717",
+                storageBucket: "taxi-macas-52717.firebasestorage.app",
+                messagingSenderId: "206011903079",
+                appId: "1:206011903079:web:b06dde539a4e0057cf38c2"
+            };
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            auth = firebase.auth();
+            db = firebase.database();
+            storage = firebase.storage();
+            auth.onAuthStateChanged((user) => {
+                if (user) syncFavorites(user.uid);
+                else state.userFavorites = {};
+                updateHeader();
+            });
+            firebaseError = false;
+        } catch (e) {
+            console.error("Firebase Error:", e);
+            firebaseError = true;
+        }
+    }
+}
+
+function syncFavorites(uid) {
+    const favRef = db.ref('favorites/' + uid);
+    favRef.on('value', (snapshot) => {
+        state.userFavorites = snapshot.val() || {};
+        if (state.currentView === 'profile') {
+            const mainContent = document.querySelector('.main-content');
+            renderView('profile', mainContent);
+        }
+    });
+}
+
+function updateHeader() {
+    const user = auth ? auth.currentUser : null;
+    const userBtn = document.querySelector('button[onclick*="navigate(\'login\')"], button[onclick*="navigate(\'profile\')"]');
+    if (userBtn) {
+        if (user) {
+            userBtn.setAttribute('onclick', "navigate('profile')");
+            userBtn.style.color = "var(--secondary-lilac)";
+        } else {
+            userBtn.setAttribute('onclick', "navigate('login')");
+            userBtn.style.color = "var(--secondary-cyan)";
+        }
+    }
+}
 
 const LOGO_URL = "https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png";
 
@@ -85,7 +150,7 @@ function navigate(view) {
         const textElement = item.querySelector('span');
         if (textElement) {
             const text = textElement.innerText.toLowerCase();
-            if (text.includes(view) || (view === 'home' && text === 'inicio') || (view === 'news' && text === 'noticias') || (view === 'guide' && text === 'guía')) {
+            if (text.includes(view) || (view === 'home' && text === 'inicio') || (view === 'community' && text.includes('social')) || (view === 'guide' && text === 'guía')) {
                 item.classList.add('active');
             }
         }
@@ -174,6 +239,22 @@ function renderView(view, container) {
                 </div>
             `;
             initHomePage();
+            break;
+
+        case 'community':
+            container.innerHTML = `
+                <div id="community-feed" class="tiktok-feed">
+                    <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
+                        <p style="font-weight: 700; letter-spacing: 1px;">ENTRANDO A GOOPISOCIAL...</p>
+                    </div>
+                </div>
+
+                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 110px; z-index: 1000;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            `;
+            initCommunity();
             break;
 
         case 'taxi':
@@ -307,6 +388,46 @@ function renderView(view, container) {
 
                     <div style="text-align: center; margin-top: 20px; padding-bottom: 20px;">
                         <p style="color: var(--text-dim); font-size: 14px;">¿Ya eres parte? <a href="#" onclick="navigate('login')" style="color: var(--secondary-lilac); font-weight: 800; text-decoration: none;">Inicia Sesión</a></p>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'profile':
+            const user = auth ? auth.currentUser : null;
+            const favIds = Object.keys(state.userFavorites);
+            const userPosts = state.communityPosts.filter(p => p.userId === (user ? user.uid : ''));
+
+            container.innerHTML = `
+                <div style="text-align: center; margin-top: 40px; position: relative;">
+                    <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border);">
+                        <i class="fas fa-user-astronaut"></i>
+                    </div>
+                    <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900;">VERIFICADO</div>
+                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
+                    <p style="color: var(--text-dim); padding-bottom: 20px;">${user ? user.email : 'Inicia sesión para más funciones'}</p>
+                </div>
+                
+                <div style="margin-top: 20px; padding-bottom: 150px;">
+                    <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${state.userPoints}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${favIds.length}</div><div style="font-size: 10px; color: var(--text-dim);">FAVS</div></div>
+                    </div>
+
+                    <div class="section-header">
+                        <h2>Mis Gooper Reels</h2>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 30px;">
+                        ${userPosts.length > 0 ? userPosts.map(p => `
+                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="navigate('community')">
+                                ${p.mediaUrl ? (p.mediaType === 'video' ? `<video src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;"></video>` : `<img src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;">`) : `<div style="padding: 5px; font-size: 8px; color: var(--text-dim); overflow: hidden;">${p.text}</div>`}
+                            </div>
+                        `).join('') : '<div style="grid-column: span 3; color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px;">No has grabado Reels todavía.</div>'}
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        ${user ? `<button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">CERRAR SESIÓN</button>` : `<button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">INICIAR SESIÓN</button>`}
                     </div>
                 </div>
             `;
@@ -474,6 +595,8 @@ function closeDetails() {
 
 document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.querySelector('.main-content');
+    initFirebase();
+    initCommunity();
     renderView('home', mainContent);
 
     // Register Service Worker for PWA
@@ -495,3 +618,198 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// --- COMMUNITY & SOCIAL LOGIC ---
+function initCommunity() {
+    if (!db) return;
+    const postsRef = db.ref('posts');
+    postsRef.on('value', (snapshot) => {
+        const rawPosts = snapshot.val() || {};
+        state.communityPosts = Object.keys(rawPosts).map(id => ({
+            id,
+            ...rawPosts[id]
+        })).reverse();
+
+        if (state.currentView === 'community') {
+            renderCommunityPosts();
+        } else if (state.currentView === 'profile') {
+            const mainContent = document.querySelector('.main-content');
+            renderView('profile', mainContent);
+        }
+    });
+}
+
+function renderCommunityPosts() {
+    const feed = document.getElementById('community-feed');
+    if (!feed) return;
+
+    if (state.communityPosts.length === 0) {
+        feed.innerHTML = `
+            <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;">
+                <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 20px; opacity: 0.5;"></i>
+                <h2>Aún no hay Reels</h2>
+                <p style="color: #888;">¡Sé el primero en compartir un momento regional!</p>
+            </div>
+        `;
+        return;
+    }
+
+    feed.innerHTML = state.communityPosts.map(post => {
+        const user = auth ? auth.currentUser : null;
+        const liked = post.likes && user && post.likes[user.uid];
+        const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+
+        return `
+            <div id="post-${post.id}" class="tiktok-post">
+                ${post.mediaUrl ? (
+                post.mediaType === 'video'
+                    ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline onclick="toggleVideo(this)"></video>`
+                    : `<img src="${post.mediaUrl}" class="tiktok-media">`
+            ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`}
+                
+                <div class="tiktok-overlay">
+                    <div class="tiktok-actions">
+                        <div class="action-item" onclick="handleLike('${post.id}')">
+                            <i class="fas fa-heart ${liked ? 'liked' : ''}"></i>
+                            <span>${likesCount}</span>
+                        </div>
+                        <div class="action-item" onclick="showComments('${post.id}')">
+                            <i class="fas fa-comment-dots"></i>
+                            <span>${post.comments ? Object.keys(post.comments).length : 0}</span>
+                        </div>
+                        <div class="action-item" onclick="sharePost('${post.id}')">
+                            <i class="fas fa-share"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="tiktok-info">
+                        <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
+                        <div class="post-desc">${post.text || ''}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Auto-play first video
+    const videos = feed.querySelectorAll('video');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.play().catch(e => console.log("Auto-play blocked"));
+            } else {
+                entry.target.pause();
+            }
+        });
+    }, { threshold: 0.8 });
+
+    videos.forEach(v => observer.observe(v));
+}
+
+function toggleVideo(video) {
+    if (video.paused) video.play();
+    else video.pause();
+}
+
+async function handleLike(postId) {
+    if (!auth.currentUser) return navigate('login');
+    const post = state.communityPosts.find(p => p.id === postId);
+    const userId = auth.currentUser.uid;
+    const likeRef = db.ref(`posts/${postId}/likes/${userId}`);
+
+    if (post.likes && post.likes[userId]) {
+        await likeRef.remove();
+    } else {
+        await likeRef.set(true);
+    }
+}
+
+function showPostComposer() {
+    if (!auth || !auth.currentUser) return navigate('login');
+
+    const modal = document.createElement('div');
+    modal.style = "position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2100; padding: 30px; display: flex; flex-direction: column; gap: 20px; backdrop-filter: blur(10px); animation: fadeIn 0.3s ease-out;";
+    modal.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="color: white; margin: 0;">Nuevo Reel</h2>
+            <button onclick="this.closest('div').parentElement.remove()" style="background: none; border: none; color: white; font-size: 24px;"><i class="fas fa-times"></i></button>
+        </div>
+        <textarea id="post-text" placeholder="¿Qué está pasando en Goopi?" style="width: 100%; height: 150px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 15px; color: white; padding: 15px; outline: none; font-size: 16px;"></textarea>
+        
+        <div id="media-preview" style="width: 100%; aspect-ratio: 9/16; background: rgba(0,0,0,0.3); border-radius: 15px; border: 2px dashed var(--glass-border); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            <div style="text-align: center; color: var(--text-dim);">
+                <i class="fas fa-camera" style="font-size: 30px; margin-bottom: 10px;"></i>
+                <p>Sin multimedia</p>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <input type="file" id="media-input" accept="image/*,video/*" hidden onchange="previewMedia(this)">
+            <button onclick="document.getElementById('media-input').click()" style="padding: 15px; border-radius: 15px; border: 1px solid var(--secondary-lilac); background: none; color: var(--secondary-lilac); font-weight: 700;">SUBIR ARCHIVO</button>
+            <button onclick="submitPost(this)" style="padding: 15px; border-radius: 15px; background: var(--secondary-lilac); border: none; color: white; font-weight: 700;">PUBLICAR</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function previewMedia(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('media-preview');
+    if (!file || !preview) return;
+
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('image/')) {
+        preview.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    } else {
+        preview.innerHTML = `<video src="${url}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted loop></video>`;
+    }
+}
+
+async function submitPost(btn) {
+    const text = document.getElementById('post-text').value;
+    const fileInput = document.getElementById('media-input');
+    const user = auth.currentUser;
+
+    if (!text && !fileInput.files[0]) return alert("Escribe algo o sube una foto/video");
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Publicando...`;
+
+    try {
+        let mediaUrl = "";
+        let mediaType = "";
+
+        if (fileInput.files[0]) {
+            const file = fileInput.files[0];
+            mediaType = file.type.startsWith('video/') ? 'video' : 'image';
+            const storagePath = `posts/${user.uid}/${Date.now()}_${file.name}`;
+            const storageRef = storage.ref(storagePath);
+            await storageRef.put(file);
+            mediaUrl = await storageRef.getDownloadURL();
+        }
+
+        const newPostRef = db.ref('posts').push();
+        await newPostRef.set({
+            userId: user.uid,
+            userName: user.displayName || 'Gooper',
+            text: text,
+            mediaUrl: mediaUrl,
+            mediaType: mediaType,
+            timestamp: Date.now()
+        });
+
+        btn.closest('div').parentElement.remove();
+    } catch (e) {
+        console.error(e);
+        alert("Error al publicar: " + e.message);
+        btn.disabled = false;
+        btn.innerText = "PUBLICAR";
+    }
+}
+
+function handleLogout() {
+    auth.signOut().then(() => {
+        navigate('home');
+        window.location.reload();
+    });
+}
