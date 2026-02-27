@@ -607,12 +607,13 @@ body {
     z-index: 100;
 }
 
-/* Popup Image Scaling - Reduced 40% as requested */
+/* Popup Image Scaling - Reduced another 100px as requested */
 .popup-img {
     display: block;
     margin: 0 auto 15px;
-    width: 170px !important; /* ~40% reduction from 285px */
+    width: 70px !important;
+    /* Extreme reduction from 170px */
     height: auto !important;
     object-fit: contain;
-    border-radius: 12px;
+    border-radius: 8px;
 }

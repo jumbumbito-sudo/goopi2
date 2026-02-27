@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goopi-v34.7';
+const CACHE_NAME = 'goopi-v34.8';
 const ASSETS = [
     './',
     './index.html',
