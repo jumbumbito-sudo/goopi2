@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.4)
  */
-console.log("🚀 GOOPIAPP VERSION 31.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 31.4 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -246,11 +246,11 @@ function renderView(view, container) {
                 <div id="community-feed" class="tiktok-feed">
                     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
-                        <p style="font-weight: 700; letter-spacing: 1px;">ENTRANDO A GOOPISOCIAL...</p>
+                        <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO REELS...</p>
                     </div>
                 </div>
 
-                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 110px; z-index: 1000;">
+                <button onclick="showPostComposer()" class="floating-post-btn">
                     <i class="fas fa-plus"></i>
                 </button>
             `;
@@ -622,19 +622,24 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- COMMUNITY & SOCIAL LOGIC ---
 function initCommunity() {
     if (!db) {
-        console.warn("DB not ready, retrying in 1s...");
+        console.log("Waiting for Firebase DB...");
         setTimeout(initCommunity, 1000);
         return;
     }
 
+    // Safety: ensure posts path exists or handled
     const postsRef = db.ref('posts');
     postsRef.on('value', (snapshot) => {
-        console.log("Community data received.");
-        const rawPosts = snapshot.val() || {};
-        state.communityPosts = Object.keys(rawPosts).map(id => ({
-            id,
-            ...rawPosts[id]
-        })).reverse();
+        const rawPosts = snapshot.val();
+        if (!rawPosts) {
+            console.log("No posts found in DB yet.");
+            state.communityPosts = [];
+        } else {
+            state.communityPosts = Object.keys(rawPosts).map(id => ({
+                id,
+                ...rawPosts[id]
+            })).reverse();
+        }
 
         if (state.currentView === 'community') {
             renderCommunityPosts();
@@ -643,18 +648,20 @@ function initCommunity() {
             renderView('profile', mainContent);
         }
     }, (error) => {
-        console.error("Social DB Error:", error);
+        console.error("Firebase Rule Restriction or Connection Error:", error);
         if (state.currentView === 'community') {
             const feed = document.getElementById('community-feed');
-            if (feed) feed.innerHTML = `<div style="padding:40px; text-align:center; color:white;">
-                <i class="fas fa-exclamation-triangle" style="font-size:30px; color:#ff3b30;"></i>
-                <p style="margin-top:15px;">Error de conexión con GoopiSocial.</p>
-                <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Reintentar</button>
-            </div>`;
+            if (feed) feed.innerHTML = `
+                <div style="padding:40px; text-align:center; color:white;">
+                    <i class="fas fa-lock" style="font-size:30px; color:var(--secondary-lilac);"></i>
+                    <p style="margin-top:15px; font-weight:600;">Acceso Restringido</p>
+                    <p style="font-size:12px; opacity:0.7; margin-top:10px;">Asegúrate de que las reglas de Firebase permitan leer la ruta 'posts'.</p>
+                    <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px; font-weight:700;">REINTENTAR</button>
+                </div>`;
         }
     });
 
-    // Timeout if nothing loads in 8 seconds
+    // Timeout check
     setTimeout(() => {
         if (state.currentView === 'community' && document.getElementById('community-feed')?.innerText.includes('ENTRANDO')) {
             const feed = document.getElementById('community-feed');
