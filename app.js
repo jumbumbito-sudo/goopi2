@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.8)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.9)
  */
-console.log("🚀 GOOPIAPP VERSION 32.8 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.9 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -280,14 +280,14 @@ function renderView(view, container) {
         case 'delivery':
             container.innerHTML = `
                 <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
-                    <!-- Botón Volver -->
-                    <button onclick="navigate('home')" style="position: absolute; top: 25px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <!-- Botón Volver (Movido más abajo) -->
+                    <button onclick="navigate('home')" style="position: absolute; top: 110px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- MAPA FONDO (Ajustado para ver el banner de WP) -->
+                    <!-- MAPA FONDO (Mostrando contenido completo de WP) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 45px); border: none; position: absolute; top: -45px; left: 0;" 
+                            style="width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
