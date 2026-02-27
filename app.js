@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.2)
  */
-console.log("🚀 GOOPIAPP VERSION 32.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.2 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -267,7 +267,7 @@ function renderView(view, container) {
                     <i class="fas fa-arrow-left"></i>
                 </button>
 
-                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 30px !important; z-index: 99999 !important;">
+                <button onclick="showPostComposer()" class="floating-post-btn">
                     <i class="fas fa-plus"></i>
                 </button>
             `;
@@ -743,6 +743,89 @@ function renderCommunityPosts() {
 function toggleVideo(video) {
     if (video.paused) video.play();
     else video.pause();
+}
+
+async function sharePost(postId) {
+    const post = state.communityPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Goopi App - Reel de ' + post.userName,
+                text: post.text,
+                url: window.location.href
+            });
+        } catch (e) { console.log('Error sharing:', e); }
+    } else {
+        alert("Enlace copiado: " + window.location.href);
+    }
+}
+
+function showComments(postId) {
+    const post = state.communityPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    let existingSheet = document.querySelector('.comment-sheet');
+    if (existingSheet) existingSheet.remove();
+
+    const sheet = document.createElement('div');
+    sheet.className = 'comment-sheet';
+
+    const comments = post.comments ? Object.values(post.comments) : [];
+
+    sheet.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="color:white; margin:0;">Comentarios (${comments.length})</h3>
+            <button onclick="this.closest('.comment-sheet').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="comment-list">
+            ${comments.length > 0 ? comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-avatar">${c.userName?.[0] || 'G'}</div>
+                    <div class="comment-content">
+                        <b>${c.userName || 'Gooper'}</b>
+                        <div>${c.text}</div>
+                    </div>
+                </div>
+            `).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.3); padding:40px;">No hay comentarios aún. ¡Sé el primero!</div>'}
+        </div>
+        <div class="comment-input-area">
+            <input type="text" id="new-comment-text" placeholder="Escribe un comentario...">
+            <button onclick="sendComment('${postId}')" style="background:var(--secondary-lilac); border:none; color:white; width:45px; height:45px; border-radius:50%;"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    `;
+
+    document.body.appendChild(sheet);
+    setTimeout(() => sheet.classList.add('active'), 10);
+}
+
+async function sendComment(postId) {
+    if (!auth.currentUser) return navigate('login');
+
+    const input = document.getElementById('new-comment-text');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const btn = event.currentTarget;
+    btn.disabled = true;
+
+    try {
+        const commentRef = db.ref(`posts/${postId}/comments`).push();
+        await commentRef.set({
+            userId: auth.currentUser.uid,
+            userName: auth.currentUser.displayName || 'Gooper',
+            text: text,
+            timestamp: Date.now()
+        });
+
+        input.value = '';
+        showComments(postId); // Refresh
+    } catch (e) {
+        alert("Error al comentar: " + e.message);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function handleLike(postId) {
