@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v35.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v35.3)
  */
-console.log("🚀 GOOPIAPP VERSION 35.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 35.3 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -565,7 +565,7 @@ function showInfoPopup(page) {
             <button class="popup-close" onclick="closePopup()">
                 <i class="fas fa-times"></i>
             </button>
-            ${featuredImg ? `<img src="${featuredImg}" class="popup-img">` : ''}
+            ${featuredImg ? `<img src="${featuredImg}" class="popup-img" alt="Publicidad">` : ''}
         </div>
     `;
 
