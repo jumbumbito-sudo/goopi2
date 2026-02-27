@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v34.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v34.7)
  */
-console.log("🚀 GOOPIAPP VERSION 34.6 LOADED");
+console.log("🚀 GOOPIAPP VERSION 34.7 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
