@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v33.5)
  */
-console.log("🚀 GOOPIAPP VERSION 33.4 LOADED");
+console.log("🚀 GOOPIAPP VERSION 33.5 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -534,6 +534,69 @@ async function fetchNews() {
     } catch (e) { console.error(e); }
 }
 
+async function checkDynamicPopup() {
+    try {
+        const response = await fetch(`${wpConfig.url}/wp/v2/pages?slug=publicidad-popup&_embed`);
+        const pages = await response.json();
+
+        if (pages && pages.length > 0) {
+            const page = pages[0];
+            const lastSeenId = localStorage.getItem('last_popup_id');
+            const lastSeenTime = localStorage.getItem('last_popup_time');
+            const now = new Date().getTime();
+
+            // Mostrar si es nuevo ID o si ya pasaron 24 horas
+            if (lastSeenId !== String(page.id) || (now - (parseInt(lastSeenTime) || 0) > 24 * 60 * 60 * 1000)) {
+                showInfoPopup(page);
+            }
+        }
+    } catch (e) {
+        console.error("Popup Error:", e);
+    }
+}
+
+function showInfoPopup(page) {
+    let popupBody = document.getElementById('dynamic-popup');
+    if (!popupBody) {
+        popupBody = document.createElement('div');
+        popupBody.id = 'dynamic-popup';
+        popupBody.className = 'popup-overlay';
+        document.body.appendChild(popupBody);
+    }
+
+    const featuredImg = page._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+
+    popupBody.innerHTML = `
+        <div class="popup-content">
+            <button class="popup-close" onclick="closePopup()">
+                <i class="fas fa-times"></i>
+            </button>
+            ${featuredImg ? `<img src="${featuredImg}" style="width: 100%; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3);">` : ''}
+            <h2 style="color: var(--secondary-lilac); margin-bottom: 15px; font-weight: 800;">${page.title.rendered}</h2>
+            <div style="color: var(--text-dim); line-height: 1.6; font-size: 14px; margin-bottom: 20px;">
+                ${page.content.rendered}
+            </div>
+            <button onclick="closePopup()" style="width: 100%; background: linear-gradient(135deg, var(--secondary-lilac), var(--secondary-cyan)); color: white; border: none; padding: 15px; border-radius: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">
+                Entendido
+            </button>
+        </div>
+    `;
+
+    setTimeout(() => {
+        popupBody.classList.add('active');
+        localStorage.setItem('last_popup_id', page.id);
+        localStorage.setItem('last_popup_time', new Date().getTime());
+    }, 1500);
+}
+
+function closePopup() {
+    const popup = document.getElementById('dynamic-popup');
+    if (popup) {
+        popup.classList.remove('active');
+        setTimeout(() => popup.remove(), 400);
+    }
+}
+
 function viewDetails(postId) {
     const post = state.posts.find(p => p.id === postId);
     if (!post) return;
@@ -595,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFirebase();
     initCommunity();
     renderView('home', mainContent);
+    checkDynamicPopup(); // New: Check for dynamic notices from WP
 
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
