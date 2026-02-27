@@ -425,13 +425,12 @@ body {
 /* Floating Actions */
 .floating-post-btn {
     position: fixed;
-    right: 15px;
-    bottom: 300px;
-    /* Moved up away from actions */
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
     width: 50px;
-    /* Smaller as requested */
     height: 50px;
-    background: linear-gradient(135deg, rgba(190, 150, 255, 0.4) 0%, rgba(140, 48, 155, 0.4) 100%);
+    background: linear-gradient(135deg, rgba(190, 150, 255, 0.45) 0%, rgba(140, 48, 155, 0.45) 100%);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -440,10 +439,15 @@ body {
     font-size: 20px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(8px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     z-index: 9999;
     cursor: pointer;
-    opacity: 0.8;
+    opacity: 0.9;
+    transition: 0.2s;
+}
+
+.floating-post-btn:active {
+    transform: translateX(-50%) scale(0.9);
 }
 
 /* Comments Sheet */
