@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.0)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v32.1)
  */
-console.log("🚀 GOOPIAPP VERSION 32.0 LOADED");
+console.log("🚀 GOOPIAPP VERSION 32.1 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -815,11 +815,27 @@ async function submitPost(btn) {
 
         if (fileInput.files[0]) {
             const file = fileInput.files[0];
+            console.log("Subiendo archivo:", file.name);
             mediaType = file.type.startsWith('video/') ? 'video' : 'image';
             const storagePath = `posts/${user.uid}/${Date.now()}_${file.name}`;
             const storageRef = storage.ref(storagePath);
-            await storageRef.put(file);
+
+            // Monitor upload progress (Optional but helpful)
+            const uploadTask = storageRef.put(file);
+
+            await new Promise((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        btn.innerText = `SUBIENDO: ${Math.round(progress)}%`;
+                    },
+                    (error) => reject(error),
+                    () => resolve()
+                );
+            });
+
             mediaUrl = await storageRef.getDownloadURL();
+            console.log("Archivo subido con éxito:", mediaUrl);
         }
 
         const newPostRef = db.ref('posts').push();
@@ -832,7 +848,9 @@ async function submitPost(btn) {
             timestamp: Date.now()
         });
 
+        alert("¡Publicado con éxito!");
         btn.closest('div').parentElement.remove();
+        if (state.currentView === 'community') initCommunity();
     } catch (e) {
         console.error(e);
         alert("Error al publicar: " + e.message);
