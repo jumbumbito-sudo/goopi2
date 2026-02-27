@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.5.1)
  */
-console.log("🚀 GOOPIAPP VERSION 31.4 LOADED");
+console.log("🚀 GOOPIAPP VERSION 31.5.1 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -159,7 +159,7 @@ function navigate(view) {
     const header = document.querySelector('.app-header');
     const mainContent = document.querySelector('.main-content');
 
-    if (view === 'taxi' || view === 'delivery') {
+    if (view === 'taxi' || view === 'delivery' || view === 'community') {
         header.style.display = 'none';
         mainContent.style.padding = '0';
         mainContent.style.marginTop = '0';
@@ -250,7 +250,12 @@ function renderView(view, container) {
                     </div>
                 </div>
 
-                <button onclick="showPostComposer()" class="floating-post-btn">
+                <!-- Botón Volver (Solo en Social) -->
+                <button onclick="navigate('home')" style="position: fixed; top: 25px; left: 20px; z-index: 6000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+
+                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 150px !important;">
                     <i class="fas fa-plus"></i>
                 </button>
             `;
