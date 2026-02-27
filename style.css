@@ -365,10 +365,11 @@ body {
 .tiktok-actions {
     position: absolute;
     right: 15px;
-    bottom: 60px;
+    bottom: 30px;
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 30px;
+    /* Increased gap to prevent overlap */
     align-items: center;
     z-index: 10;
     pointer-events: auto;
@@ -378,15 +379,23 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    /* Better spacing to avoid overlap */
     color: white;
     cursor: pointer;
+    opacity: 0.6;
+    /* Higher transparency */
+    transition: 0.2s;
+}
+
+.action-item:hover {
+    opacity: 1;
 }
 
 .action-item i {
-    font-size: 32px;
-    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
-    transition: 0.2s;
+    font-size: 26px;
+    /* Slightly smaller for premium look */
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
 }
 
 .action-item i.liked {
@@ -416,21 +425,108 @@ body {
 /* Floating Actions */
 .floating-post-btn {
     position: fixed;
-    right: 20px;
-    bottom: 40px;
-    width: 65px;
-    height: 65px;
-    background: linear-gradient(135deg, var(--secondary-lilac) 0%, #8c309b 100%);
+    right: 15px;
+    bottom: 300px;
+    /* Moved up away from actions */
+    width: 50px;
+    /* Smaller as requested */
+    height: 50px;
+    background: linear-gradient(135deg, rgba(190, 150, 255, 0.4) 0%, rgba(140, 48, 155, 0.4) 100%);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 28px;
-    border: none;
-    box-shadow: 0 8px 25px rgba(186, 150, 255, 0.6);
-    z-index: 5000;
+    font-size: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
     cursor: pointer;
+    opacity: 0.8;
+}
+
+/* Comments Sheet */
+.comment-sheet {
+    position: fixed;
+    bottom: -100%;
+    left: 0;
+    right: 0;
+    height: 75vh;
+    background: #1a0b2e;
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+    z-index: 10000;
+    transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--glass-border);
+}
+
+.comment-sheet.active {
+    bottom: 0;
+}
+
+.comment-list {
+    flex: 1;
+    overflow-y: auto;
+    margin: 15px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    scrollbar-width: none;
+}
+
+.comment-item {
+    display: flex;
+    gap: 12px;
+}
+
+.comment-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: var(--secondary-lilac);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+    font-size: 14px;
+}
+
+.comment-content {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 15px;
+    border-radius: 15px;
+    color: white;
+}
+
+.comment-content b {
+    display: block;
+    font-size: 13px;
+    color: var(--secondary-lilac);
+    margin-bottom: 4px;
+}
+
+.comment-input-area {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comment-input-area input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 12px 15px;
+    color: white;
+    outline: none;
 }
 
 .badge-gooper {
