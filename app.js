@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.5.1)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v31.6)
  */
-console.log("🚀 GOOPIAPP VERSION 31.5.1 LOADED");
+console.log("🚀 GOOPIAPP VERSION 31.6 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -157,20 +157,21 @@ function navigate(view) {
     });
 
     const header = document.querySelector('.app-header');
+    const nav = document.querySelector('.bottom-nav');
     const mainContent = document.querySelector('.main-content');
 
     if (view === 'taxi' || view === 'delivery' || view === 'community') {
         header.style.display = 'none';
+        if (nav) nav.style.display = 'none';
         mainContent.style.padding = '0';
         mainContent.style.marginTop = '0';
         mainContent.style.height = '100vh';
         mainContent.style.width = '100vw';
     } else {
         header.style.display = 'flex';
+        if (nav) nav.style.display = 'flex';
         mainContent.style.padding = '20px';
         mainContent.style.marginTop = '0';
-        mainContent.style.height = 'auto';
-        mainContent.style.width = 'auto';
     }
 
     mainContent.style.opacity = '0';
