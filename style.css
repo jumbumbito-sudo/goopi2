@@ -613,8 +613,8 @@ body {
 .popup-content img {
     display: block;
     margin: 0 auto 15px;
-    width: 150px !important;
-    /* Fixed small size */
+    width: 225px !important;
+    /* Increased by 50% as requested */
     height: auto !important;
     object-fit: contain;
     border-radius: 12px;
