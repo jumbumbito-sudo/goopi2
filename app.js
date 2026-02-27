@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v35.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v35.7)
  */
-console.log("🚀 GOOPIAPP VERSION 35.6 LOADED");
+console.log("🚀 GOOPIAPP VERSION 35.7 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -558,14 +558,25 @@ function showInfoPopup(page) {
         document.body.appendChild(popupBody);
     }
 
-    const featuredImg = page._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+    // Intenta obtener la imagen destacada o la primera imagen del contenido
+    let imgPath = page._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+    
+    // Si no hay imagen destacada, buscamos una etiqueta <img> en el contenido
+    if (!imgPath) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = page.content.rendered;
+        const firstImg = tempDiv.querySelector('img');
+        if (firstImg) {
+            imgPath = firstImg.src;
+        }
+    }
 
     popupBody.innerHTML = `
         <div class="popup-content">
             <button class="popup-close" onclick="closePopup()">
                 <i class="fas fa-times"></i>
             </button>
-            ${featuredImg ? `<img src="${featuredImg}" class="popup-img" alt="Publicidad">` : ''}
+            ${imgPath ? `<img src="${imgPath}" class="popup-img" alt="Publicidad">` : '<div style="color:white;text-align:center;padding:20px;">Falta imagen destacada en WordPress</div>'}
         </div>
     `;
 
