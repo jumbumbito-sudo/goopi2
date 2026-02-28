@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon"
         href="https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png">
 
-    <link rel="stylesheet" href="style.css?v=36.2">
+    <link rel="stylesheet" href="style.css?v=36.4">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -34,7 +34,7 @@
                     alt="Goopi Logo">
             </div>
             <div class="user-actions">
-                <button id="searchBtn"
+                <button onclick="toggleSearch()"
                     style="background:none; border:none; color:white; font-size:20px; margin-right: 15px;">
                     <i class="fas fa-search"></i>
                 </button>
@@ -150,9 +150,22 @@
             </button>
             <div id="details-content"></div>
         </div>
+
+        <!-- Search Overlay -->
+        <div id="search-overlay" class="search-overlay">
+            <div class="search-header">
+                <button class="back-btn" onclick="toggleSearch()" style="margin-bottom: 0;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <input type="text" id="main-search-input" placeholder="Buscar negocios o productos..." onkeyup="handleSearch(event)">
+            </div>
+            <div id="search-results" class="search-results">
+                <!-- Search results will load here -->
+            </div>
+        </div>
     </div>
 
-    <script src="app.js?v=36.2"></script>
+    <script src="app.js?v=36.4"></script>
 </body>
 
 </html>

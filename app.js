@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.2)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.4)
  */
-console.log("🚀 GOOPIAPP VERSION 36.2 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.4 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -677,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.2')
+            navigator.serviceWorker.register('./sw.js?v=36.3')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
@@ -1087,4 +1087,46 @@ function handleEmailRegister(btn) {
 function handleGoogleLogin() {
     const provider = new firebase.auth.GoogleAuthProvider();
     auth.signInWithRedirect(provider);
+}
+
+// --- SEARCH LOGIC ---
+function toggleSearch() {
+    const searchOverlay = document.getElementById('search-overlay');
+    searchOverlay.classList.toggle('active');
+    if (searchOverlay.classList.contains('active')) {
+        document.getElementById('main-search-input').focus();
+    }
+}
+
+async function handleSearch(event) {
+    const query = event.target.value.trim();
+    if (event.key === 'Enter' || query.length > 2) {
+        if (!query) return;
+
+        const resultsContainer = document.getElementById('search-results');
+        resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--secondary-lilac);"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+
+        try {
+            const response = await fetch(`${wpConfig.url}/wp/v2/posts?_embed&search=${encodeURIComponent(query)}&per_page=15`);
+            const results = await response.json();
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-dim);">No se encontraron resultados para "' + query + '"</div>';
+                return;
+            }
+
+            resultsContainer.innerHTML = results.map(post => `
+                <div class="search-item" onclick="toggleSearch(); viewDetails(${post.id})">
+                    <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/300'}" alt="${post.title.rendered}">
+                    <div>
+                        <h4>${post.title.rendered}</h4>
+                        <p style="font-size:10px; color:var(--text-dim);">Guía Comercial</p>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error("Search failed:", e);
+            resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#ff3b30;">Error al buscar. Intenta de nuevo.</div>';
+        }
+    }
 }

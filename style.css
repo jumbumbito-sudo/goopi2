@@ -204,19 +204,24 @@ body {
 
 /* Bottom Navigation */
 .bottom-nav {
-    position: absolute;
+    position: fixed;
+    /* Asegura que el nav siempre flote al fondo */
     bottom: 0;
     left: 0;
     right: 0;
     height: 80px;
     background: #05050a;
     backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(190, 150, 255, 0.1);
+    border-top: 2px solid var(--secondary-lilac);
+    /* Refuerzo visual solicitado */
     display: flex;
     justify-content: space-around;
     align-items: center;
     padding: 0 10px;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* Fix para Notch de iPhone/Samsung */
     z-index: 3000;
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.8);
 }
 
 .nav-item {
@@ -625,4 +630,71 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     opacity: 1 !important;
     visibility: visible !important;
+}
+
+/* Search Overlay */
+.search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-dark);
+    z-index: 4000;
+    padding: 20px;
+    display: none;
+    flex-direction: column;
+}
+
+.search-overlay.active {
+    display: flex;
+}
+
+.search-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 20px;
+}
+
+.search-header input {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 15px;
+    padding: 12px 15px;
+    color: white;
+    outline: none;
+    font-size: 16px;
+}
+
+.search-results {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.search-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: var(--card-bg);
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+}
+
+.search-item img {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.search-item h4 {
+    font-size: 14px;
+    color: white;
 }
