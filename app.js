@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.5)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.6)
  */
-console.log("🚀 GOOPIAPP VERSION 36.5 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.6 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -88,9 +88,15 @@ function updateHeader() {
     if (userBtn) {
         if (user) {
             userBtn.setAttribute('onclick', "navigate('profile')");
-            userBtn.style.color = "var(--secondary-lilac)";
+            if (user.photoURL) {
+                userBtn.innerHTML = `<img src="${user.photoURL}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--secondary-lilac);">`;
+            } else {
+                userBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
+                userBtn.style.color = "var(--secondary-lilac)";
+            }
         } else {
             userBtn.setAttribute('onclick', "navigate('login')");
+            userBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
             userBtn.style.color = "var(--secondary-cyan)";
         }
     }
@@ -437,19 +443,21 @@ function renderView(view, container) {
 
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px; position: relative;">
-                    <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border);">
-                        <i class="fas fa-user-astronaut"></i>
+                    <div onclick="document.getElementById('profile-upload').click()" style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border); position: relative; cursor: pointer; overflow: hidden;">
+                        ${user && user.photoURL ? `<img src="${user.photoURL}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut"></i>`}
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); font-size: 10px; padding: 4px 0; font-weight: 700;"><i class="fas fa-camera"></i> EDITAR</div>
                     </div>
-                    <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900;">VERIFICADO</div>
-                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
+                    <input type="file" id="profile-upload" accept="image/*" hidden onchange="updateProfilePhoto(this)">
+                    <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900; z-index: 10;">VERIFICADO</div>
+                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px; color: white;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
                     <p style="color: var(--text-dim); padding-bottom: 20px;">${user ? user.email : 'Inicia sesión para más funciones'}</p>
                 </div>
                 
                 <div style="margin-top: 20px; padding-bottom: 150px;">
                     <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
                         <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${state.userPoints}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${favIds.length}</div><div style="font-size: 10px; color: var(--text-dim);">FAVS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #00f3ff; font-size: 20px;">${state.userPoints}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #ff2d55; font-size: 20px;">${Object.keys(state.userFollowing || {}).length}</div><div style="font-size: 10px; color: var(--text-dim);">SIGUIENDO</div></div>
                     </div>
 
                     <div class="section-header">
@@ -701,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.5')
+            navigator.serviceWorker.register('./sw.js?v=36.6')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
@@ -819,9 +827,14 @@ function renderCommunityPosts() {
 
                 <div class="tiktok-overlay">
                     <div class="tiktok-info" onclick="event.stopPropagation()">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                            <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
-                            ${(user && user.uid !== post.userId) ? `<button onclick="toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'transparent' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: ${state.userFollowing && state.userFollowing[post.userId] ? 'var(--secondary-lilac)' : 'white'}; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 800; cursor: pointer;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--secondary-lilac); border: 2px solid white; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                    ${post.userPhoto ? `<img src="${post.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut" style="color: white; font-size: 18px;"></i>`}
+                                </div>
+                                ${(user && user.uid !== post.userId) ? `<button onclick="toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
+                            </div>
+                            <div class="user-tag" style="margin-bottom: 0; font-size: 18px; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1);">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
                         </div>
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
@@ -899,9 +912,14 @@ function showComments(postId) {
         <div class="comment-list">
             ${comments.length > 0 ? comments.map(c => `
                 <div class="comment-item">
-                    <div class="comment-avatar">${c.userName?.[0] || 'G'}</div>
+                    <div class="comment-avatar" style="overflow: hidden;">
+                        ${c.userPhoto ? `<img src="${c.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : (c.userName?.[0] || 'G')}
+                    </div>
                     <div class="comment-content">
-                        <b>${c.userName || 'Gooper'}</b>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <b style="margin: 0;">${c.userName || 'Gooper'}</b>
+                            <span style="font-size: 8px; color: var(--text-dim);">${new Date(c.timestamp).toLocaleDateString()}</span>
+                        </div>
                         <div>${c.text}</div>
                     </div>
                 </div>
@@ -932,6 +950,7 @@ async function sendComment(postId) {
         await commentRef.set({
             userId: auth.currentUser.uid,
             userName: auth.currentUser.displayName || 'Gooper',
+            userPhoto: auth.currentUser.photoURL || '',
             text: text,
             timestamp: Date.now()
         });
@@ -1042,6 +1061,7 @@ async function submitPost(btn) {
         await newPostRef.set({
             userId: user.uid,
             userName: user.displayName || 'Gooper',
+            userPhoto: user.photoURL || '',
             text: text,
             mediaUrl: mediaUrl,
             mediaType: mediaType,
@@ -1161,11 +1181,15 @@ async function handleSearch(event) {
 // --- SOCIAL ENHANCEMENTS ---
 async function toggleFollow(targetUserId, btn) {
     const user = auth ? auth.currentUser : null;
-    if (!user) return alert("Inicia sesión para seguir cuentas");
+    if (!user) return navigate('login');
     if (!db) return;
 
-    const isFollowing = state.userFollowing[targetUserId];
+    const isFollowing = state.userFollowing && state.userFollowing[targetUserId];
     const followRef = db.ref(`following/${user.uid}/${targetUserId}`);
+
+    // UI Feedback instantáneo
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
 
     try {
         if (isFollowing) {
@@ -1173,9 +1197,42 @@ async function toggleFollow(targetUserId, btn) {
         } else {
             await followRef.set(true);
         }
-        // State will update via syncFollowing listener
     } catch (e) {
         console.error("Follow error:", e);
+        alert("Error de conexión");
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+    }
+}
+
+async function updateProfilePhoto(input) {
+    const file = input.files[0];
+    const user = auth.currentUser;
+    if (!file || !user) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+        return alert("La imagen es muy pesada. Máximo 2MB.");
+    }
+
+    // Loader visual
+    const profileContainer = input.parentElement;
+    const originalHtml = profileContainer.innerHTML;
+    profileContainer.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="fas fa-spinner fa-spin"></i></div>`;
+
+    try {
+        const storageRef = storage.ref(`profiles/${user.uid}/photo.jpg`);
+        await storageRef.put(file);
+        const photoURL = await storageRef.getDownloadURL();
+        await user.updateProfile({ photoURL: photoURL });
+
+        console.log("Foto actualizada:", photoURL);
+        // Recargar vista para ver cambios
+        renderView('profile', document.querySelector('.main-content'));
+    } catch (e) {
+        console.error(e);
+        alert("Error al subir la foto. Intenta de nuevo.");
+        profileContainer.innerHTML = originalHtml;
     }
 }
 
@@ -1233,17 +1290,28 @@ function handleUserSearch(event) {
         return;
     }
 
-    resultsContainer.innerHTML = users.map(u => `
-        <div class="search-item" onclick="document.getElementById('user-search-overlay').classList.remove('active'); focusOnUserPosts('${u.uid}')">
-            <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white;">
-                <i class="fas fa-user"></i>
+    resultsContainer.innerHTML = users.map(u => {
+        const isFollowing = state.userFollowing && state.userFollowing[u.uid];
+        return `
+            <div class="search-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1;" onclick="document.getElementById('user-search-overlay').classList.remove('active'); focusOnUserPosts('${u.uid}')">
+                    <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h4>@${u.name.replace(/\s+/g, '').toLowerCase()}</h4>
+                        <p style="font-size:10px; color:var(--text-dim);">${u.name}</p>
+                    </div>
+                </div>
+                ${(auth.currentUser && auth.currentUser.uid !== u.uid) ? `
+                    <button onclick="event.stopPropagation(); toggleFollow('${u.uid}', this); setTimeout(() => handleUserSearch({target: document.getElementById('user-search-input')}), 500)" 
+                        style="background: ${isFollowing ? 'transparent' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer;">
+                        ${isFollowing ? 'SIGUIENDO' : 'SEGUIR'}
+                    </button>
+                ` : ''}
             </div>
-            <div>
-                <h4>@${u.name.replace(/\s+/g, '').toLowerCase()}</h4>
-                <p style="font-size:10px; color:var(--text-dim);">${u.name}</p>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function focusOnUserPosts(uid) {
