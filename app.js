@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.5)
  */
-console.log("🚀 GOOPIAPP VERSION 36.4 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.5 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -14,6 +14,7 @@ const state = {
     posts: [],
     communityPosts: [],
     userFavorites: {},
+    userFollowing: {},
     userPoints: 100,
     isMuted: true // Start muted for better PWA experience
 };
@@ -43,8 +44,13 @@ function initFirebase() {
             db = firebase.database();
             storage = firebase.storage();
             auth.onAuthStateChanged((user) => {
-                if (user) syncFavorites(user.uid);
-                else state.userFavorites = {};
+                if (user) {
+                    syncFavorites(user.uid);
+                    syncFollowing(user.uid);
+                } else {
+                    state.userFavorites = {};
+                    state.userFollowing = {};
+                }
                 updateHeader();
             });
             firebaseError = false;
@@ -62,6 +68,16 @@ function syncFavorites(uid) {
         if (state.currentView === 'profile') {
             const mainContent = document.querySelector('.main-content');
             renderView('profile', mainContent);
+        }
+    });
+}
+
+function syncFollowing(uid) {
+    const followRef = db.ref('following/' + uid);
+    followRef.on('value', (snapshot) => {
+        state.userFollowing = snapshot.val() || {};
+        if (state.currentView === 'community') {
+            renderCommunityPosts();
         }
     });
 }
@@ -281,10 +297,18 @@ function renderView(view, container) {
                         <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO...</p>
                     </div>
                 </div>
+                </div>
 
-                <button onclick="navigate('home')" style="position: fixed; top: 25px; left: 20px; z-index: 9999; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                    <i class="fas fa-arrow-left"></i>
-                </button>
+                <!-- Botones Superiores Community -->
+                <div style="position: fixed; top: 25px; left: 0; right: 0; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; z-index: 9999;">
+                    <button onclick="navigate('home')" style="background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    
+                    <button onclick="showUserSearch()" style="background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
 
                 <button onclick="showPostComposer()" class="floating-post-btn">
                     <i class="fas fa-plus"></i>
@@ -677,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.3')
+            navigator.serviceWorker.register('./sw.js?v=36.5')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
@@ -795,7 +819,10 @@ function renderCommunityPosts() {
 
                 <div class="tiktok-overlay">
                     <div class="tiktok-info" onclick="event.stopPropagation()">
-                        <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                            <div class="user-tag">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
+                            ${(user && user.uid !== post.userId) ? `<button onclick="toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'transparent' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: ${state.userFollowing && state.userFollowing[post.userId] ? 'var(--secondary-lilac)' : 'white'}; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 800; cursor: pointer;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
+                        </div>
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
                 </div>
@@ -1128,5 +1155,106 @@ async function handleSearch(event) {
             console.error("Search failed:", e);
             resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#ff3b30;">Error al buscar. Intenta de nuevo.</div>';
         }
+    }
+}
+
+// --- SOCIAL ENHANCEMENTS ---
+async function toggleFollow(targetUserId, btn) {
+    const user = auth ? auth.currentUser : null;
+    if (!user) return alert("Inicia sesión para seguir cuentas");
+    if (!db) return;
+
+    const isFollowing = state.userFollowing[targetUserId];
+    const followRef = db.ref(`following/${user.uid}/${targetUserId}`);
+
+    try {
+        if (isFollowing) {
+            await followRef.remove();
+        } else {
+            await followRef.set(true);
+        }
+        // State will update via syncFollowing listener
+    } catch (e) {
+        console.error("Follow error:", e);
+    }
+}
+
+function showUserSearch() {
+    let searchOverlay = document.getElementById('user-search-overlay');
+    if (!searchOverlay) {
+        searchOverlay = document.createElement('div');
+        searchOverlay.id = 'user-search-overlay';
+        searchOverlay.className = 'search-overlay'; // Reusing styles
+        searchOverlay.innerHTML = `
+            <div class="search-header">
+                <button class="back-btn" onclick="document.getElementById('user-search-overlay').classList.remove('active')" style="margin-bottom: 0;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <input type="text" id="user-search-input" placeholder="Buscar usuarios (@gooper...)" onkeyup="handleUserSearch(event)">
+            </div>
+            <div id="user-search-results" class="search-results">
+                <!-- User results -->
+            </div>
+        `;
+        document.body.appendChild(searchOverlay);
+    }
+    searchOverlay.classList.add('active');
+    document.getElementById('user-search-input').focus();
+}
+
+function handleUserSearch(event) {
+    const query = event.target.value.trim().toLowerCase().replace('@', '');
+    const resultsContainer = document.getElementById('user-search-results');
+
+    if (query.length < 2) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    // Since we don't have a global user list in Firebase, we search unique names from communityPosts
+    const users = [];
+    const seenUids = new Set();
+
+    state.communityPosts.forEach(post => {
+        if (!seenUids.has(post.userId)) {
+            const userName = post.userName.toLowerCase();
+            if (userName.includes(query)) {
+                users.push({
+                    uid: post.userId,
+                    name: post.userName
+                });
+                seenUids.add(post.userId);
+            }
+        }
+    });
+
+    if (users.length === 0) {
+        resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-dim);">No se encontraron usuarios comunitarios.</div>';
+        return;
+    }
+
+    resultsContainer.innerHTML = users.map(u => `
+        <div class="search-item" onclick="document.getElementById('user-search-overlay').classList.remove('active'); focusOnUserPosts('${u.uid}')">
+            <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white;">
+                <i class="fas fa-user"></i>
+            </div>
+            <div>
+                <h4>@${u.name.replace(/\s+/g, '').toLowerCase()}</h4>
+                <p style="font-size:10px; color:var(--text-dim);">${u.name}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function focusOnUserPosts(uid) {
+    // Scroll to first post of this user in feed
+    const firstPost = document.querySelector(`.tiktok-post[id^="post-"]`); // placeholder
+    const userPosts = state.communityPosts.filter(p => p.userId === uid);
+    if (userPosts.length > 0) {
+        state.communityPosts = [
+            ...state.communityPosts.filter(p => p.userId === uid),
+            ...state.communityPosts.filter(p => p.userId !== uid)
+        ];
+        renderCommunityPosts();
     }
 }
