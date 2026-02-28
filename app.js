@@ -16,7 +16,8 @@ const state = {
     userFavorites: {},
     userFollowing: {},
     userPoints: 100,
-    isMuted: true // Start muted for better PWA experience
+    targetProfileId: null, // UID of the profile being viewed
+    isMuted: true
 };
 
 // Firebase Safe-Initialization
@@ -437,43 +438,64 @@ function renderView(view, container) {
             break;
 
         case 'profile':
-            const user = auth ? auth.currentUser : null;
-            const favIds = Object.keys(state.userFavorites);
-            const userPosts = state.communityPosts.filter(p => p.userId === (user ? user.uid : ''));
+            const currentUser = auth ? auth.currentUser : null;
+            const profileId = state.targetProfileId || (currentUser ? currentUser.uid : null);
+
+            // Si no hay perfil que mostrar (ni el propio ni uno externo) mandamos a login
+            if (!profileId) return navigate('login');
+
+            // Buscamos datos del usuario en los posts para perfiles públicos
+            const profileData = state.communityPosts.find(p => p.userId === profileId) || {
+                userName: currentUser && currentUser.uid === profileId ? currentUser.displayName : 'Gooper',
+                userPhoto: currentUser && currentUser.uid === profileId ? currentUser.photoURL : ''
+            };
+
+            const userPosts = state.communityPosts.filter(p => p.userId === profileId);
+            const isMyOwnProfile = currentUser && currentUser.uid === profileId;
+            const isFollowingUser = state.userFollowing && state.userFollowing[profileId];
 
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px; position: relative;">
-                    <div onclick="document.getElementById('profile-upload').click()" style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border); position: relative; cursor: pointer; overflow: hidden;">
-                        ${user && user.photoURL ? `<img src="${user.photoURL}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut"></i>`}
-                        <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); font-size: 10px; padding: 4px 0; font-weight: 700;"><i class="fas fa-camera"></i> EDITAR</div>
+                    ${!isMyOwnProfile ? `<button onclick="navigate('community')" style="position: absolute; top: 0; left: 0; background: none; border: none; color: white; font-size: 20px;"><i class="fas fa-arrow-left"></i></button>` : ''}
+                    
+                    <div ${isMyOwnProfile ? `onclick="document.getElementById('profile-upload').click()"` : ''} style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border); position: relative; ${isMyOwnProfile ? 'cursor: pointer;' : ''} overflow: hidden;">
+                        ${profileData.userPhoto ? `<img src="${profileData.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut"></i>`}
+                        ${isMyOwnProfile ? `<div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); font-size: 10px; padding: 4px 0; font-weight: 700;"><i class="fas fa-camera"></i> EDITAR</div>` : ''}
                     </div>
-                    <input type="file" id="profile-upload" accept="image/*" hidden onchange="updateProfilePhoto(this)">
+                    ${isMyOwnProfile ? `<input type="file" id="profile-upload" accept="image/*" hidden onchange="updateProfilePhoto(this)">` : ''}
+                    
                     <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900; z-index: 10;">VERIFICADO</div>
-                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px; color: white;">${user ? (user.displayName || 'Gooper') : 'Invitado'}</h1>
-                    <p style="color: var(--text-dim); padding-bottom: 20px;">${user ? user.email : 'Inicia sesión para más funciones'}</p>
+                    
+                    <h1 style="font-size: 26px; font-weight: 800; margin-top: 15px; color: white;">@${profileData.userName.replace(/\s+/g, '').toLowerCase()}</h1>
+                    <p style="color: var(--text-dim); padding-bottom: 20px;">${isMyOwnProfile ? (currentUser.email) : 'Miembro de la Comunidad Goopi'}</p>
+
+                    ${!isMyOwnProfile ? `
+                        <button onclick="toggleFollow('${profileId}', this).then(() => renderView('profile', document.querySelector('.main-content')))" 
+                            style="background: ${isFollowingUser ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 12px 30px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; margin-bottom: 20px;">
+                            ${isFollowingUser ? 'SIGUIENDO' : 'SEGUIR'}
+                        </button>
+                    ` : ''}
                 </div>
                 
                 <div style="margin-top: 20px; padding-bottom: 150px;">
                     <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
                         <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: #00f3ff; font-size: 20px;">${state.userPoints}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: #ff2d55; font-size: 20px;">${Object.keys(state.userFollowing || {}).length}</div><div style="font-size: 10px; color: var(--text-dim);">SIGUIENDO</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #00f3ff; font-size: 20px;">${isMyOwnProfile ? state.userPoints : '---'}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #ff2d55; font-size: 20px;">${isMyOwnProfile ? Object.keys(state.userFollowing || {}).length : (userPosts[0]?.likes ? Object.keys(userPosts[0].likes).length : 0)}</div><div style="font-size: 10px; color: var(--text-dim);">${isMyOwnProfile ? 'SIGUIENDO' : 'LIKES'}</div></div>
                     </div>
 
                     <div class="section-header">
-                        <h2>Mis Gooper Reels</h2>
+                        <h2>Explorar Reels</h2>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 30px;">
                         ${userPosts.length > 0 ? userPosts.map(p => `
-                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="navigate('community')">
+                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="navigate('community'); focusOnUserPosts('${profileId}')">
                                 ${p.mediaUrl ? (p.mediaType === 'video' ? `<video src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;"></video>` : `<img src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;">`) : `<div style="padding: 5px; font-size: 8px; color: var(--text-dim); overflow: hidden;">${p.text}</div>`}
                             </div>
-                        `).join('') : '<div style="grid-column: span 3; color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px;">No has grabado Reels todavía.</div>'}
+                        `).join('') : '<div style="grid-column: span 3; color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px;">Este usuario aún no tiene Reels.</div>'}
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        ${user ? `<button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">CERRAR SESIÓN</button>` : `<button onclick="navigate('login')" class="action-card" style="width: 100%; background: var(--secondary-lilac); border: none; color: white; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">INICIAR SESIÓN</button>`}
-                    </div>
+                    ${isMyOwnProfile ? `<button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">CERRAR SESIÓN</button>` : ''}
                 </div>
             `;
             break;
@@ -829,12 +851,14 @@ function renderCommunityPosts() {
                     <div class="tiktok-info" onclick="event.stopPropagation()">
                         <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--secondary-lilac); border: 2px solid white; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                    ${post.userPhoto ? `<img src="${post.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut" style="color: white; font-size: 18px;"></i>`}
+                                <div onclick="viewUserProfile('${post.userId}')" style="width: 40px; height: 40px; border-radius: 50%; background: var(--secondary-lilac); border: 2px solid white; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;">
+                                    ${(user && post.userId === user.uid && user.photoURL)
+                ? `<img src="${user.photoURL}" style="width: 100%; height: 100%; object-fit: cover;">`
+                : (post.userPhoto ? `<img src="${post.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut" style="color: white; font-size: 18px;"></i>`)}
                                 </div>
-                                ${(user && user.uid !== post.userId) ? `<button onclick="toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
+                                ${(user && user.uid !== post.userId) ? `<button onclick="event.stopPropagation(); toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
                             </div>
-                            <div class="user-tag" style="margin-bottom: 0; font-size: 18px; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1);">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
+                            <div onclick="viewUserProfile('${post.userId}')" class="user-tag" style="margin-bottom: 0; font-size: 18px; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1); cursor: pointer;">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
                         </div>
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
@@ -1179,89 +1203,9 @@ async function handleSearch(event) {
 }
 
 // --- SOCIAL ENHANCEMENTS ---
-async function toggleFollow(targetUserId, btn) {
-    const user = auth ? auth.currentUser : null;
-    if (!user) return navigate('login');
-    if (!db) return;
-
-    const isFollowing = state.userFollowing && state.userFollowing[targetUserId];
-    const followRef = db.ref(`following/${user.uid}/${targetUserId}`);
-
-    // UI Feedback instantáneo
-    btn.disabled = true;
-    btn.style.opacity = "0.5";
-
-    try {
-        if (isFollowing) {
-            await followRef.remove();
-        } else {
-            await followRef.set(true);
-        }
-    } catch (e) {
-        console.error("Follow error:", e);
-        alert("Error de conexión");
-    } finally {
-        btn.disabled = false;
-        btn.style.opacity = "1";
-    }
-}
-
-async function updateProfilePhoto(input) {
-    const file = input.files[0];
-    const user = auth ? auth.currentUser : null;
-
-    if (!file || !user) return;
-
-    // Safety check for storage
-    if (!storage) {
-        return alert("El servicio de almacenamiento de Goopi aún no está listo. Por favor, espera unos segundos y reintenta.");
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-        return alert("La imagen es demasiado pesada. El tamaño máximo es 2MB.");
-    }
-
-    // Seleccionamos específicamente el círculo del avatar para mostrar el cargador
-    const avatarDiv = document.querySelector('div[onclick*="profile-upload"]');
-    if (!avatarDiv) return;
-
-    const originalHtml = avatarDiv.innerHTML;
-    avatarDiv.innerHTML = `<i class="fas fa-spinner fa-spin" style="font-size: 30px;"></i>`;
-    avatarDiv.style.pointerEvents = "none";
-
-    try {
-        console.log("Subiendo nueva foto de perfil para:", user.uid);
-
-        // Creamos una referencia única para evitar problemas de caché
-        const storageRef = storage.ref(`profiles/${user.uid}/profile_${Date.now()}.jpg`);
-
-        // Iniciamos la subida
-        const snapshot = await storageRef.put(file);
-        const photoURL = await snapshot.ref.getDownloadURL();
-
-        console.log("Foto subida correctamente. URL:", photoURL);
-
-        // Actualizamos el perfil de Firebase Auth
-        await user.updateProfile({
-            photoURL: photoURL
-        });
-
-        // Forzamos la actualización de la interfaz
-        console.log("Perfil de usuario actualizado con éxito.");
-
-        // Actualizamos el encabezado y la vista actual
-        updateHeader();
-        const mainContent = document.querySelector('.main-content');
-        renderView('profile', mainContent);
-
-    } catch (e) {
-        console.error("Error crítico al subir foto de perfil:", e);
-        alert("Hubo un error al guardar la foto: " + (e.code === 'storage/unauthorized' ? "Sin permisos de escritura." : e.message));
-
-        // Restauramos el estado original en caso de error
-        avatarDiv.innerHTML = originalHtml;
-        avatarDiv.style.pointerEvents = "auto";
-    }
+function viewUserProfile(uid) {
+    state.targetProfileId = uid;
+    navigate('profile');
 }
 
 function showUserSearch() {
@@ -1306,7 +1250,8 @@ function handleUserSearch(event) {
             if (userName.includes(query)) {
                 users.push({
                     uid: post.userId,
-                    name: post.userName
+                    name: post.userName,
+                    photo: post.userPhoto || ''
                 });
                 seenUids.add(post.userId);
             }
@@ -1323,8 +1268,8 @@ function handleUserSearch(event) {
         return `
             <div class="search-item" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 15px; flex: 1;" onclick="document.getElementById('user-search-overlay').classList.remove('active'); focusOnUserPosts('${u.uid}')">
-                    <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white;">
-                        <i class="fas fa-user"></i>
+                    <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white; overflow: hidden;">
+                        ${u.photo ? `<img src="${u.photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user"></i>`}
                     </div>
                     <div>
                         <h4>@${u.name.replace(/\s+/g, '').toLowerCase()}</h4>
@@ -1332,7 +1277,7 @@ function handleUserSearch(event) {
                     </div>
                 </div>
                 ${(auth.currentUser && auth.currentUser.uid !== u.uid) ? `
-                    <button onclick="event.stopPropagation(); toggleFollow('${u.uid}', this); setTimeout(() => handleUserSearch({target: document.getElementById('user-search-input')}), 500)" 
+                    <button onclick="event.stopPropagation(); toggleFollow('${u.uid}', this).then(() => { setTimeout(() => { const input = document.getElementById('user-search-input'); if(input) handleUserSearch({target: input}); }, 500); })" 
                         style="background: ${isFollowing ? 'transparent' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer;">
                         ${isFollowing ? 'SIGUIENDO' : 'SEGUIR'}
                     </button>
@@ -1342,15 +1287,77 @@ function handleUserSearch(event) {
     }).join('');
 }
 
-function focusOnUserPosts(uid) {
-    // Scroll to first post of this user in feed
-    const firstPost = document.querySelector(`.tiktok-post[id^="post-"]`); // placeholder
-    const userPosts = state.communityPosts.filter(p => p.userId === uid);
-    if (userPosts.length > 0) {
-        state.communityPosts = [
-            ...state.communityPosts.filter(p => p.userId === uid),
-            ...state.communityPosts.filter(p => p.userId !== uid)
-        ];
-        renderCommunityPosts();
+async function toggleFollow(targetUserId, btn) {
+    const user = auth ? auth.currentUser : null;
+    if (!user) {
+        alert("Inicia sesión para seguir a otros Goopers");
+        return navigate('login');
+    }
+    if (!db) return alert("Error: Base de datos no inicializada");
+
+    const isFollowing = state.userFollowing && state.userFollowing[targetUserId];
+    const followRef = db.ref(`following/${user.uid}/${targetUserId}`);
+
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+
+    try {
+        if (isFollowing) {
+            await followRef.remove();
+        } else {
+            await followRef.set(true);
+        }
+    } catch (e) {
+        console.error("Follow error:", e);
+        if (e.message.includes("permission_denied")) {
+            alert("❌ ERROR DE PERMISOS EN BASE DE DATOS:\n\nDebes ir a Firebase Console > Realtime Database > Rules y permitir acceso a la ruta 'following'.");
+        } else {
+            alert("Hubo un error al procesar tu solicitud. Intenta de nuevo.");
+        }
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+    }
+}
+
+async function updateProfilePhoto(input) {
+    const file = input.files[0];
+    const user = auth ? auth.currentUser : null;
+
+    if (!file || !user) return;
+
+    if (!storage) {
+        return alert("El servicio de almacenamiento no está disponible.");
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+        return alert("¡Archivo muy grande! Máximo 2MB.");
+    }
+
+    const avatarDiv = document.querySelector('div[onclick*="profile-upload"]');
+    if (!avatarDiv) return;
+
+    const originalHtml = avatarDiv.innerHTML;
+    avatarDiv.innerHTML = `<i class="fas fa-spinner fa-spin" style="font-size: 30px;"></i>`;
+    avatarDiv.style.pointerEvents = "none";
+
+    try {
+        console.log("Iniciando subida de perfil...");
+        const storageRef = storage.ref(`profiles/${user.uid}/photo.jpg`);
+        const metadata = { contentType: file.type };
+        const snapshot = await storageRef.put(file, metadata);
+        const photoURL = await snapshot.ref.getDownloadURL();
+        await user.updateProfile({ photoURL: photoURL });
+        updateHeader();
+        renderView('profile', document.querySelector('.main-content'));
+    } catch (e) {
+        console.error("Error Firebase Storage:", e);
+        if (e.code === 'storage/unauthorized') {
+            alert("❌ ERROR DE PERMISOS:\n\nDebes ir a Firebase Console > Storage > Rules y cambiar la regla a:\n\nallow read, write: if request.auth != null;");
+        } else {
+            alert("Error: " + e.message);
+        }
+        avatarDiv.innerHTML = originalHtml;
+        avatarDiv.style.pointerEvents = "auto";
     }
 }
