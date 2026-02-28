@@ -1208,31 +1208,59 @@ async function toggleFollow(targetUserId, btn) {
 
 async function updateProfilePhoto(input) {
     const file = input.files[0];
-    const user = auth.currentUser;
+    const user = auth ? auth.currentUser : null;
+
     if (!file || !user) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-        return alert("La imagen es muy pesada. Máximo 2MB.");
+    // Safety check for storage
+    if (!storage) {
+        return alert("El servicio de almacenamiento de Goopi aún no está listo. Por favor, espera unos segundos y reintenta.");
     }
 
-    // Loader visual
-    const profileContainer = input.parentElement;
-    const originalHtml = profileContainer.innerHTML;
-    profileContainer.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="fas fa-spinner fa-spin"></i></div>`;
+    if (file.size > 2 * 1024 * 1024) {
+        return alert("La imagen es demasiado pesada. El tamaño máximo es 2MB.");
+    }
+
+    // Seleccionamos específicamente el círculo del avatar para mostrar el cargador
+    const avatarDiv = document.querySelector('div[onclick*="profile-upload"]');
+    if (!avatarDiv) return;
+
+    const originalHtml = avatarDiv.innerHTML;
+    avatarDiv.innerHTML = `<i class="fas fa-spinner fa-spin" style="font-size: 30px;"></i>`;
+    avatarDiv.style.pointerEvents = "none";
 
     try {
-        const storageRef = storage.ref(`profiles/${user.uid}/photo.jpg`);
-        await storageRef.put(file);
-        const photoURL = await storageRef.getDownloadURL();
-        await user.updateProfile({ photoURL: photoURL });
+        console.log("Subiendo nueva foto de perfil para:", user.uid);
 
-        console.log("Foto actualizada:", photoURL);
-        // Recargar vista para ver cambios
-        renderView('profile', document.querySelector('.main-content'));
+        // Creamos una referencia única para evitar problemas de caché
+        const storageRef = storage.ref(`profiles/${user.uid}/profile_${Date.now()}.jpg`);
+
+        // Iniciamos la subida
+        const snapshot = await storageRef.put(file);
+        const photoURL = await snapshot.ref.getDownloadURL();
+
+        console.log("Foto subida correctamente. URL:", photoURL);
+
+        // Actualizamos el perfil de Firebase Auth
+        await user.updateProfile({
+            photoURL: photoURL
+        });
+
+        // Forzamos la actualización de la interfaz
+        console.log("Perfil de usuario actualizado con éxito.");
+
+        // Actualizamos el encabezado y la vista actual
+        updateHeader();
+        const mainContent = document.querySelector('.main-content');
+        renderView('profile', mainContent);
+
     } catch (e) {
-        console.error(e);
-        alert("Error al subir la foto. Intenta de nuevo.");
-        profileContainer.innerHTML = originalHtml;
+        console.error("Error crítico al subir foto de perfil:", e);
+        alert("Hubo un error al guardar la foto: " + (e.code === 'storage/unauthorized' ? "Sin permisos de escritura." : e.message));
+
+        // Restauramos el estado original en caso de error
+        avatarDiv.innerHTML = originalHtml;
+        avatarDiv.style.pointerEvents = "auto";
     }
 }
 
