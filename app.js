@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.7)
  */
-console.log("🚀 GOOPIAPP VERSION 36.6 LOADED");
+console.log("🚀 GOOPIAPP VERSION 36.7 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -16,6 +16,8 @@ const state = {
     userFavorites: {},
     userFollowing: {},
     userPoints: 100,
+    dailyAttempts: 3,
+    lastGameDate: null,
     targetProfileId: null, // UID of the profile being viewed
     isMuted: true
 };
@@ -24,6 +26,7 @@ const state = {
 let auth = null;
 let db = null;
 let storage = null;
+let fs = null; // Firestore
 let firebaseError = false;
 
 function initFirebase() {
@@ -44,13 +47,16 @@ function initFirebase() {
             auth = firebase.auth();
             db = firebase.database();
             storage = firebase.storage();
+            fs = firebase.firestore();
             auth.onAuthStateChanged((user) => {
                 if (user) {
                     syncFavorites(user.uid);
                     syncFollowing(user.uid);
+                    syncGameStats(user.uid);
                 } else {
                     state.userFavorites = {};
                     state.userFollowing = {};
+                    state.dailyAttempts = 3;
                 }
                 updateHeader();
             });
@@ -73,13 +79,24 @@ function syncFavorites(uid) {
     });
 }
 
-function syncFollowing(uid) {
-    const followRef = db.ref('following/' + uid);
-    followRef.on('value', (snapshot) => {
-        state.userFollowing = snapshot.val() || {};
-        if (state.currentView === 'community') {
-            renderCommunityPosts();
+function syncGameStats(uid) {
+    const gameRef = db.ref('gameStats/' + uid);
+    gameRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        const today = new Date().toLocaleDateString();
+
+        if (data) {
+            if (data.points !== undefined) state.userPoints = data.points;
+
+            if (data.lastDate === today) {
+                state.dailyAttempts = data.attempts !== undefined ? data.attempts : 3;
+            } else {
+                state.dailyAttempts = 3;
+            }
         }
+
+        const pointsEl = document.getElementById('points-display-total');
+        if (pointsEl) pointsEl.innerText = state.userPoints;
     });
 }
 
@@ -166,8 +183,6 @@ function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
 }
 
 function navigate(view) {
-    console.log(`Navigating to: ${view}`);
-
     const navItems = document.querySelectorAll('.bottom-nav .nav-item');
     navItems.forEach(item => {
         item.classList.remove('active');
@@ -279,7 +294,7 @@ function renderView(view, container) {
                 </section>
 
                 <section class="units-area" style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
-                    <button onclick="window.location.href='https://goopiapp.com/registro-de-taxistas/'" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
+                    <button onclick="navigate('register-driver')" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                         <i class="fas fa-id-card"></i> Registro de Unidades
                     </button>
                     <button onclick="window.location.href='https://goopiapp.com/panel-taxista/'" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
@@ -437,6 +452,62 @@ function renderView(view, container) {
             `;
             break;
 
+        case 'register-driver':
+            const isLogged = auth && auth.currentUser;
+            container.innerHTML = `
+                <div style="text-align: center; margin-top: 30px;">
+                    <h1 style="font-size: 28px; text-shadow: 0 0 10px var(--secondary-lilac); font-weight: 800;">Registro de Unidad</h1>
+                    <p style="color: var(--text-dim);">Únete a la flota oficial de Goopi</p>
+                </div>
+
+                <div style="margin-top: 25px; display: flex; flex-direction: column; gap: 15px; padding: 0 10px;">
+                    ${!isLogged ? `
+                        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px dashed var(--secondary-lilac); margin-bottom: 10px;">
+                            <p style="font-size: 13px; color: var(--secondary-lilac); text-align: center;">Tip: Si ya tienes cuenta en GoopiSocial, <a href="#" onclick="navigate('login')" style="color:white; font-weight:700;">Inicia Sesión</a> primero.</p>
+                        </div>
+                        <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-envelope" style="color: var(--secondary-lilac);"></i>
+                            <input type="email" id="driver-email" placeholder="Correo electrónico" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        </div>
+                        <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
+                            <input type="password" id="driver-password" placeholder="Contraseña para tu cuenta" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        </div>
+                    ` : `
+                        <div style="background: rgba(0,243,255,0.1); padding: 15px; border-radius: 15px; border: 1px solid #00f3ff; margin-bottom: 10px;">
+                            <p style="font-size: 13px; color: #00f3ff; text-align: center;"><i class="fas fa-check-circle"></i> Registrando como: <b>${auth.currentUser.email}</b></p>
+                        </div>
+                    `}
+
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-briefcase" style="color: var(--secondary-lilac);"></i>
+                        <select id="driver-role" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
+                            <option value="taxi" style="background: #1a0b2e;">Servicio de Taxi</option>
+                            <option value="delivery" style="background: #1a0b2e;">Servicio de Delivery</option>
+                        </select>
+                    </div>
+
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-users" style="color: var(--secondary-lilac);"></i>
+                        <input type="text" id="driver-coop" placeholder="Nombre de Cooperativa o Empresa" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                    </div>
+
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-hashtag" style="color: var(--secondary-lilac);"></i>
+                        <input type="number" id="driver-unit" placeholder="Número de unidad" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                    </div>
+
+                    <button onclick="handleDriverRegistration(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; border-radius: 18px; box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);">
+                        FINALIZAR REGISTRO
+                    </button>
+
+                    <p style="color: var(--text-dim); font-size: 11px; text-align: center; margin-top: 10px;">Al registrarte, aceptas los términos de servicio para conductores de Goopi App.</p>
+
+                    <button onclick="navigate('home')" style="background: none; border: none; color: var(--text-dim); margin-top: 10px; cursor: pointer; font-size: 14px;">Cancelar y volver</button>
+                </div>
+            `;
+            break;
+
         case 'profile':
             const currentUser = auth ? auth.currentUser : null;
             const profileId = state.targetProfileId || (currentUser ? currentUser.uid : null);
@@ -457,11 +528,11 @@ function renderView(view, container) {
             container.innerHTML = `
                 <div style="text-align: center; margin-top: 40px; position: relative;">
                     ${!isMyOwnProfile ? `<button onclick="navigate('community')" style="position: absolute; top: 0; left: 0; background: none; border: none; color: white; font-size: 20px;"><i class="fas fa-arrow-left"></i></button>` : ''}
-                    
-                    <div ${isMyOwnProfile ? `onclick="document.getElementById('profile-upload').click()"` : ''} style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border); position: relative; ${isMyOwnProfile ? 'cursor: pointer;' : ''} overflow: hidden;">
-                        ${profileData.userPhoto ? `<img src="${profileData.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut"></i>`}
-                        ${isMyOwnProfile ? `<div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); font-size: 10px; padding: 4px 0; font-weight: 700;"><i class="fas fa-camera"></i> EDITAR</div>` : ''}
-                    </div>
+
+            <div ${isMyOwnProfile ? `onclick="document.getElementById('profile-upload').click()"` : ''} style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-lilac); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 20px var(--secondary-lilac); border: 4px solid var(--glass-border); position: relative; ${isMyOwnProfile ? 'cursor: pointer;' : ''} overflow: hidden;">
+                ${profileData.userPhoto ? `<img src="${profileData.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut"></i>`}
+                ${isMyOwnProfile ? `<div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.5); font-size: 10px; padding: 4px 0; font-weight: 700;"><i class="fas fa-camera"></i> EDITAR</div>` : ''}
+            </div>
                     ${isMyOwnProfile ? `<input type="file" id="profile-upload" accept="image/*" hidden onchange="updateProfilePhoto(this)">` : ''}
                     
                     <div style="position: absolute; top: 110px; left: 50%; transform: translateX(25px); background: #00f3ff; color: #00363d; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 900; z-index: 10;">VERIFICADO</div>
@@ -474,9 +545,10 @@ function renderView(view, container) {
                             style="background: ${isFollowingUser ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 12px 30px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; margin-bottom: 20px;">
                             ${isFollowingUser ? 'SIGUIENDO' : 'SEGUIR'}
                         </button>
-                    ` : ''}
+                    ` : ''
+                }
                 </div>
-                
+
                 <div style="margin-top: 20px; padding-bottom: 150px;">
                     <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
                         <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
@@ -573,11 +645,11 @@ async function fetchLocales(categoryId = null) {
             list.innerHTML = locales.map(local => `
                 <div class="business-card" style="display: flex; gap: 15px; align-items: center; padding: 15px;" onclick="viewDetails(${local.id})">
                     <img src="${local._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/100'}" style="width: 70px; height: 70px; border-radius: 12px;">
-                    <div style="flex: 1;">
-                        <h3 style="margin: 0; font-size: 15px; font-weight: 800;">${local.title.rendered}</h3>
-                        <p style="margin: 5px 0 0; font-size: 10px; color: var(--text-dim);">LOCAL CERTIFICADO</p>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0; font-size: 15px; font-weight: 800;">${local.title.rendered}</h3>
+                            <p style="margin: 5px 0 0; font-size: 10px; color: var(--text-dim);">LOCAL CERTIFICADO</p>
+                        </div>
                     </div>
-                </div>
             `).join('');
         }
     } catch (e) { console.error(e); }
@@ -611,7 +683,6 @@ async function checkDynamicPopup() {
 
         if (pages && pages.length > 0) {
             const page = pages[0];
-            // Removed 24h check for testing as requested to ensure it stays visible
             showInfoPopup(page);
         }
     } catch (e) {
@@ -728,10 +799,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderView('home', mainContent);
     checkDynamicPopup(); // New: Check for dynamic notices from WP
 
+    // Mostrar Juego de Minas si hay intentos y está logueado
+    setTimeout(() => {
+        if (auth.currentUser && state.dailyAttempts > 0) {
+            showMinesGame();
+        }
+    }, 4000);
+
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.6')
+            navigator.serviceWorker.register('./sw.js?v=36.7')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
@@ -781,12 +859,12 @@ function initCommunity() {
         if (state.currentView === 'community') {
             const feed = document.getElementById('community-feed');
             if (feed) feed.innerHTML = `
-                <div style="padding:40px; text-align:center; color:white;">
+                < div style = "padding:40px; text-align:center; color:white;" >
                     <i class="fas fa-lock" style="font-size:30px; color:var(--secondary-lilac);"></i>
                     <p style="margin-top:15px; font-weight:600;">Acceso Restringido</p>
                     <p style="font-size:12px; opacity:0.7; margin-top:10px;">Asegúrate de que las reglas de Firebase permitan leer la ruta 'posts'.</p>
                     <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px; font-weight:700;">REINTENTAR</button>
-                </div>`;
+                </div > `;
         }
     });
 
@@ -794,11 +872,11 @@ function initCommunity() {
     setTimeout(() => {
         if (state.currentView === 'community' && document.getElementById('community-feed')?.innerText.includes('ENTRANDO')) {
             const feed = document.getElementById('community-feed');
-            if (feed) feed.innerHTML = `<div style="padding:40px; text-align:center; color:white;">
+            if (feed) feed.innerHTML = `< div style = "padding:40px; text-align:center; color:white;" >
                 <i class="fas fa-wifi-slash" style="font-size:30px; opacity:0.5;"></i>
                 <p style="margin-top:15px;">Parece que la conexión es lenta...</p>
                 <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Forzar carga</button>
-            </div>`;
+            </div > `;
         }
     }, 8000);
 }
@@ -809,12 +887,12 @@ function renderCommunityPosts() {
 
     if (state.communityPosts.length === 0) {
         feed.innerHTML = `
-            <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;">
+                < div style = "height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;" >
                 <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 20px; opacity: 0.5;"></i>
                 <h2>Aún no hay Reels</h2>
                 <p style="color: #888;">¡Sé el primero en compartir un momento regional!</p>
-            </div>
-        `;
+            </div >
+                `;
         return;
     }
     feed.innerHTML = state.communityPosts.map(post => {
@@ -823,12 +901,13 @@ function renderCommunityPosts() {
         const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
         return `
-            <div id="post-${post.id}" class="tiktok-post">
-                ${post.mediaUrl ? (
+                < div id = "post-${post.id}" class="tiktok-post" >
+                    ${post.mediaUrl ? (
                 post.mediaType === 'video'
                     ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
                     : `<img src="${post.mediaUrl}" class="tiktok-media">`
-            ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`}
+            ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`
+            }
                 
                 <div class="tiktok-actions">
                     <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
@@ -863,8 +942,8 @@ function renderCommunityPosts() {
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
                 </div>
-            </div>
-        `;
+            </div >
+                `;
     }).join('');
 
     // Auto-play first video
@@ -895,7 +974,7 @@ function toggleMute() {
     // Update icons in all action items
     const muteIcons = document.querySelectorAll('.tiktok-actions .fa-volume-up, .tiktok-actions .fa-volume-mute');
     muteIcons.forEach(icon => {
-        icon.className = `fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}`;
+        icon.className = `fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'} `;
     });
 }
 
@@ -929,10 +1008,10 @@ function showComments(postId) {
     const comments = post.comments ? Object.values(post.comments) : [];
 
     sheet.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                < div style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;" >
             <h3 style="color:white; margin:0;">Comentarios (${comments.length})</h3>
             <button onclick="this.closest('.comment-sheet').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-times"></i></button>
-        </div>
+        </div >
         <div class="comment-list">
             ${comments.length > 0 ? comments.map(c => `
                 <div class="comment-item">
@@ -953,7 +1032,7 @@ function showComments(postId) {
             <input type="text" id="new-comment-text" placeholder="Escribe un comentario...">
             <button onclick="sendComment('${postId}')" style="background:var(--secondary-lilac); border:none; color:white; width:45px; height:45px; border-radius:50%;"><i class="fas fa-paper-plane"></i></button>
         </div>
-    `;
+            `;
 
     document.body.appendChild(sheet);
     setTimeout(() => sheet.classList.add('active'), 10);
@@ -970,7 +1049,7 @@ async function sendComment(postId) {
     btn.disabled = true;
 
     try {
-        const commentRef = db.ref(`posts/${postId}/comments`).push();
+        const commentRef = db.ref(`posts / ${postId}/comments`).push();
         await commentRef.set({
             userId: auth.currentUser.uid,
             userName: auth.currentUser.displayName || 'Gooper',
@@ -1146,6 +1225,14 @@ function handleEmailRegister(btn) {
             return result.user.updateProfile({ displayName: name });
         })
         .then(() => {
+            // Create initial user document in Firestore if needed
+            return fs.collection('usuarios').doc(auth.currentUser.uid).set({
+                nombre: name,
+                email: email,
+                fechaRegistro: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        })
+        .then(() => {
             navigate('home');
         })
         .catch(e => {
@@ -1153,6 +1240,74 @@ function handleEmailRegister(btn) {
             btn.disabled = false;
             btn.innerText = "CREAR MI CUENTA";
         });
+}
+
+async function handleDriverRegistration(btn) {
+    const role = document.getElementById('driver-role').value; // 'taxi' -> 'taxista', 'delivery' -> 'delivery'
+    const finalRole = role === 'taxi' ? 'taxista' : 'delivery';
+    const coop = document.getElementById('driver-coop').value;
+    const unit = document.getElementById('driver-unit').value;
+
+    // Si no está logueado, necesitamos email/pass
+    const emailInput = document.getElementById('driver-email');
+    const passInput = document.getElementById('driver-password');
+
+    if (!coop || !unit) return alert("La cooperativa y número de unidad son obligatorios");
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> REGISTRANDO...`;
+
+    try {
+        let user = auth.currentUser;
+
+        // Si no hay usuario, intentamos crear uno nuevo
+        if (!user) {
+            const email = emailInput.value;
+            const password = passInput.value;
+            if (!email || !password) {
+                btn.disabled = false;
+                btn.innerText = "FINALIZAR REGISTRO";
+                return alert("Por favor ingresa un correo y contraseña para crear tu cuenta Gooper");
+            }
+
+            try {
+                const result = await auth.createUserWithEmailAndPassword(email, password);
+                user = result.user;
+            } catch (e) {
+                if (e.code === 'auth/email-already-in-use') {
+                    alert("Este correo ya está registrado en Goopi. Por favor, INICIA SESIÓN primero y luego vuelve aquí para registrar tu unidad.");
+                    navigate('login');
+                    return;
+                }
+                throw e;
+            }
+        }
+
+        // Crear documento en la colección 'taxis' (Según reglas enviadas)
+        await fs.collection('taxis').doc(user.uid).set({
+            uid: user.uid,
+            email: user.email,
+            rol: finalRole,
+            cooperativa: coop,
+            unidad: unit,
+            habilitado: false, // Requerido por reglas para 'create'
+            bloqueadoAdmin: false, // Requerido por reglas para 'create'
+            activo: false,
+            lat: 0,
+            lng: 0,
+            ultimaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert("¡Registro enviado con éxito! Un administrador revisará tu solicitud para activarte en el mapa.");
+        navigate('home');
+
+    } catch (e) {
+        console.error("Error Driver Reg:", e);
+        alert("Error: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "FINALIZAR REGISTRO";
+    }
 }
 
 function handleGoogleLogin() {

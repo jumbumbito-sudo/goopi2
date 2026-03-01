@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon"
         href="https://goopiapp.com/wp-content/uploads/2026/02/cropped-e628f4e1-a38c-4da8-ae79-343f049eb3c3.png">
 
-    <link rel="stylesheet" href="style.css?v=36.5">
+    <link rel="stylesheet" href="style.css?v=36.7">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -22,6 +22,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-app-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-auth-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-storage-compat.js"></script>
 </head>
 
@@ -108,7 +109,7 @@
             <!-- Units Buttons -->
             <section class="units-area"
                 style="margin-top: 25px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 30px;">
-                <button onclick="window.location.href='https://goopiapp.com/registro-de-taxistas/'" class="action-card"
+                <button onclick="navigate('register-driver')" class="action-card"
                     style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                     <i class="fas fa-id-card"></i> Registro de Unidades
                 </button>
@@ -166,7 +167,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=36.5"></script>
+    <script src="app.js?v=36.7"></script>
 </body>
 
 </html>

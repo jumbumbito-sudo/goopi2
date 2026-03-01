@@ -478,6 +478,150 @@ body {
     border: 1px solid var(--glass-border);
 }
 
+/* Mines Goopi - Casino Style */
+.mines-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(15px);
+    padding: 20px;
+}
+
+.mines-container {
+    background: linear-gradient(135deg, #1a0b2e 0%, #05050a 100%);
+    width: 100%;
+    max-width: 400px;
+    border-radius: 30px;
+    border: 2px solid var(--secondary-lilac);
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(190, 150, 255, 0.3);
+    position: relative;
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mines-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin: 20px 0;
+}
+
+.mine-cell {
+    aspect-ratio: 1/1;
+    background: rgba(186, 150, 255, 0.1);
+    border: 1px solid rgba(186, 150, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mine-cell:active {
+    transform: scale(0.9);
+}
+
+.mine-cell.revealed-diamond {
+    background: linear-gradient(135deg, #00f3ff 0%, #00a8b3 100%);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+    border: none;
+    animation: popIn 0.3s ease-out;
+}
+
+.mine-cell.revealed-mine {
+    background: linear-gradient(135deg, #ff2d55 0%, #8b0000 100%);
+    box-shadow: 0 0 15px rgba(255, 45, 85, 0.5);
+    border: none;
+    animation: shake 0.3s ease;
+}
+
+.mines-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 20px;
+    border-radius: 15px;
+    border: 1px solid var(--glass-border);
+}
+
+.mines-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 15px;
+    border: none;
+    font-weight: 800;
+    font-size: 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: 0.3s;
+}
+
+.mines-btn-primary {
+    background: linear-gradient(135deg, var(--secondary-lilac) 0%, #8c309b 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(186, 150, 255, 0.4);
+}
+
+.mines-btn-cashout {
+    background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+    color: #4a3b00;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+}
+
+/* Animations */
+@keyframes popIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    80% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 .comment-sheet.active {
     bottom: 0;
 }
