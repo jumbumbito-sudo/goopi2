@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v36.7)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.3)
  */
-console.log("🚀 GOOPIAPP VERSION 36.7 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.3 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -206,17 +206,30 @@ function navigate(view) {
     // Vistas Pantalla Completa (Sin Header/Nav)
     const isFullScreen = ['taxi', 'delivery', 'community'].includes(view);
 
-    if (header) header.style.display = isFullScreen ? 'none' : 'flex';
-    if (nav) nav.style.display = isFullScreen ? 'none' : 'flex';
+    // Actualizamos estado inmediatamente para evitar fallos en initCommunity
+    state.currentView = view;
+
+    if (header) header.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
+    if (nav) nav.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
 
     if (isFullScreen) {
         mainContent.style.padding = '0';
         mainContent.style.height = '100vh';
+        mainContent.style.width = '100vw';
         mainContent.style.position = 'fixed';
+        mainContent.style.top = '0';
+        mainContent.style.left = '0';
+        mainContent.style.zIndex = '1000';
+        mainContent.style.overflow = 'hidden';
     } else {
         mainContent.style.padding = '20px 20px 100px';
         mainContent.style.height = 'auto';
+        mainContent.style.width = 'auto';
         mainContent.style.position = 'relative';
+        mainContent.style.top = 'auto';
+        mainContent.style.left = 'auto';
+        mainContent.style.zIndex = '1';
+        mainContent.style.overflow = 'auto';
     }
 
     // Animación de salida y entrada
@@ -227,7 +240,6 @@ function navigate(view) {
         renderView(view, mainContent);
         mainContent.style.opacity = '1';
         mainContent.style.transform = 'translateY(0)';
-        state.currentView = view;
         window.scrollTo(0, 0);
     }, 150);
 }
@@ -881,39 +893,8 @@ function closeDetails() {
     document.getElementById('details-overlay').classList.remove('active');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const mainContent = document.querySelector('.main-content');
-    initFirebase();
-    initCommunity();
-    renderView('home', mainContent);
-    checkDynamicPopup(); // New: Check for dynamic notices from WP
-
-    // Mostrar Juego de Minas si hay intentos y está logueado
-    setTimeout(() => {
-        if (auth.currentUser && state.dailyAttempts > 0) {
-            showMinesGame();
-        }
-    }, 4000);
-
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=37.2')
-                .then(reg => {
-                    console.log('Goopi PWA: Service Worker Registered!');
-                    reg.onupdatefound = () => {
-                        const installingWorker = reg.installing;
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                window.location.reload();
-                            }
-                        };
-                    };
-                })
-                .catch(err => console.log('Goopi PWA: Registration Failed!', err));
-        });
-    }
-});
+// La inicialización se maneja mediante BOOTSTRAP al final del archivo
+// para evitar duplicidad de eventos.
 
 // --- COMMUNITY & SOCIAL LOGIC ---
 function initCommunity() {
@@ -1607,6 +1588,22 @@ async function updateProfilePhoto(input) {
     }
 }
 
-// --- BOOTSTRAP ---
+// --- BOOTSTRAP (v37.3) ---
 initFirebase();
+initCommunity();
 navigate('home');
+checkDynamicPopup();
+
+// Mostrar Juego de Minas si hay intentos y está logueado
+setTimeout(() => {
+    if (auth && auth.currentUser && state.dailyAttempts > 0) {
+        showMinesGame();
+    }
+}, 4000);
+
+// PWA Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js?v=37.3');
+    });
+}
