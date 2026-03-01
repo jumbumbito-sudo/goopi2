@@ -781,8 +781,22 @@ function viewDetails(postId) {
     const post = state.posts.find(p => p.id === postId);
     if (!post) return;
 
-    const whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || '';
-    const telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || '';
+    // Búsqueda flexible de campos de contacto (Meta, ACF o Raíz)
+    let whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || post.whatsapp || post.acf?.whatsapp || '';
+    let telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || post.telefono || post.acf?.telefono || post.telefono_contacto || '';
+
+    // Si fallan los campos estructurados, intentamos extraer del contenido (Regex simple)
+    if (!telefono || !whatsapp) {
+        const content = post.content.rendered;
+        const phoneRegex = /(?:\+?593|0)9\d{8}|(?:\+?593|0)\d{1,2}\d{7}/g;
+        const foundNumbers = content.match(phoneRegex);
+        if (foundNumbers && foundNumbers.length > 0) {
+            if (!telefono) telefono = foundNumbers[0];
+            if (!whatsapp && foundNumbers[0].startsWith('09') || foundNumbers[0].startsWith('5939')) {
+                whatsapp = foundNumbers[0];
+            }
+        }
+    }
 
     const overlay = document.getElementById('details-overlay');
     const content = document.getElementById('details-content');
