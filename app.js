@@ -113,7 +113,7 @@ function updateHeader() {
                 userBtn.style.color = "var(--secondary-lilac)";
             }
         } else {
-            userBtn.setAttribute('onclick', "navigate('login')");
+            userBtn.setAttribute('onclick', "navigate('profile')");
             userBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
             userBtn.style.color = "var(--secondary-cyan)";
         }
@@ -512,8 +512,29 @@ function renderView(view, container) {
             const currentUser = auth ? auth.currentUser : null;
             const profileId = state.targetProfileId || (currentUser ? currentUser.uid : null);
 
-            // Si no hay perfil que mostrar (ni el propio ni uno externo) mandamos a login
-            if (!profileId) return navigate('login');
+            // Si no hay perfil que mostrar (ni el propio ni uno externo) mostramos opciones de entrada
+            if (!profileId) {
+                container.innerHTML = `
+                    <div style="text-align: center; margin-top: 60px; padding: 0 20px;">
+                        <img src="${LOGO_URL}" style="height: 100px; margin-bottom: 30px; filter: drop-shadow(0 0 10px var(--secondary-lilac));">
+                        <h1 style="font-size: 26px; font-weight: 800; color: white; margin-bottom: 15px;">¡Hola, Gooper!</h1>
+                        <p style="color: var(--text-dim); margin-bottom: 40px; font-size: 15px; line-height: 1.6;">Únete a nuestra comunidad para acceder a tu perfil, ganar puntos y conectar con otros.</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <button onclick="navigate('login')" class="action-card" style="width: 100%; padding: 20px; border: none; justify-content: center; font-weight: 800; background: var(--secondary-lilac); color: white; border-radius: 20px; font-size: 16px; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4);">
+                                <i class="fas fa-sign-in-alt" style="margin-right: 10px;"></i> ENTRAR A MI CUENTA
+                            </button>
+                            
+                            <button onclick="navigate('register')" class="action-card" style="width: 100%; padding: 20px; border: 2px solid var(--secondary-lilac); background: rgba(186, 150, 255, 0.1); justify-content: center; font-weight: 800; color: white; border-radius: 20px; font-size: 16px;">
+                                <i class="fas fa-user-plus" style="margin-right: 10px;"></i> CREAR CUENTA NUEVA
+                            </button>
+                        </div>
+                        
+                        <p style="color: var(--text-dim); font-size: 12px; margin-top: 40px; opacity: 0.6;">Goopi App - Tu conexión regional</p>
+                    </div>
+                `;
+                return;
+            }
 
             // Buscamos datos del usuario en los posts para perfiles públicos
             const profileData = state.communityPosts.find(p => p.userId === profileId) || {
