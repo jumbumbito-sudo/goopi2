@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.6)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.7)
  */
-console.log("🚀 GOOPIAPP VERSION 37.6 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.7 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -1000,7 +1000,7 @@ function renderCommunityPosts() {
             }
                 
                 ${(user && post.userId === user.uid) ? `
-                <div class="post-owner-actions" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="position: absolute; top: 20px; right: 20px; z-index: 2000; background: rgba(255,59,48,0.3); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; backdrop-filter: blur(10px); cursor: pointer;">
+                <div class="post-owner-actions" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="position: absolute; top: 65px; right: 20px; z-index: 2000; background: rgba(255,59,48,0.3); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; backdrop-filter: blur(10px); cursor: pointer;">
                     <i class="fas fa-trash-alt"></i>
                 </div>` : ''}
 
