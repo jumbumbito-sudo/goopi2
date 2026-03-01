@@ -312,13 +312,31 @@ function renderView(view, container) {
             break;
 
         case 'community':
+            if (!auth.currentUser) {
+                container.innerHTML = `
+                    <div style="height: 100vh; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 40px; text-align: center;">
+                        <button onclick="navigate('home')" style="position: absolute; top: 30px; left: 20px; background: rgba(255,255,255,0.1); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <img src="${LOGO_URL}" style="height: 80px; margin-bottom: 30px; filter: grayscale(1) opacity(0.5);">
+                        <i class="fas fa-users" style="font-size: 50px; color: var(--secondary-lilac); margin-bottom: 20px;"></i>
+                        <h2 style="color: white; font-weight: 800; margin-bottom: 10px;">Comunidad Goopi</h2>
+                        <p style="color: var(--text-dim); margin-bottom: 30px; font-size: 14px;">Inicia sesión para ver los Reels de la comunidad, dar likes y compartir momentos.</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                            <button onclick="navigate('login')" style="background: var(--secondary-lilac); color: white; border: none; padding: 15px; border-radius: 15px; font-weight: 800;">INICIAR SESIÓN</button>
+                            <button onclick="navigate('register')" style="background: none; border: 1px solid var(--secondary-lilac); color: white; padding: 15px; border-radius: 15px; font-weight: 800;">CREAR CUENTA</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
             container.innerHTML = `
                 <div id="community-feed" class="tiktok-feed" style="background: #000;">
                     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
                         <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO...</p>
                     </div>
-                </div>
                 </div>
 
                 <!-- Botones Superiores Community -->
@@ -882,24 +900,25 @@ function initCommunity() {
         if (state.currentView === 'community') {
             const feed = document.getElementById('community-feed');
             if (feed) feed.innerHTML = `
-                < div style = "padding:40px; text-align:center; color:white;" >
+                <div style="padding:40px; text-align:center; color:white;">
                     <i class="fas fa-lock" style="font-size:30px; color:var(--secondary-lilac);"></i>
                     <p style="margin-top:15px; font-weight:600;">Acceso Restringido</p>
-                    <p style="font-size:12px; opacity:0.7; margin-top:10px;">Asegúrate de que las reglas de Firebase permitan leer la ruta 'posts'.</p>
+                    <p style="font-size:12px; opacity:0.7; margin-top:10px;">Asegúrate de haber iniciado sesión correctamente.</p>
                     <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px; font-weight:700;">REINTENTAR</button>
-                </div > `;
+                </div>`;
         }
     });
 
     // Timeout check
     setTimeout(() => {
-        if (state.currentView === 'community' && document.getElementById('community-feed')?.innerText.includes('ENTRANDO')) {
+        if (state.currentView === 'community' && document.getElementById('community-feed')?.innerText.includes('SINCRONIZANDO')) {
             const feed = document.getElementById('community-feed');
-            if (feed) feed.innerHTML = `< div style = "padding:40px; text-align:center; color:white;" >
-                <i class="fas fa-wifi-slash" style="font-size:30px; opacity:0.5;"></i>
-                <p style="margin-top:15px;">Parece que la conexión es lenta...</p>
-                <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Forzar carga</button>
-            </div > `;
+            if (feed) feed.innerHTML = `
+                <div style="padding:40px; text-align:center; color:white;">
+                    <i class="fas fa-wifi-slash" style="font-size:30px; opacity:0.5;"></i>
+                    <p style="margin-top:15px;">Parece que la conexión es lenta...</p>
+                    <button onclick="navigate('community')" style="background:var(--secondary-lilac); border:none; padding:10px 20px; border-radius:10px; color:white; margin-top:15px;">Forzar carga</button>
+                </div>`;
         }
     }, 8000);
 }
@@ -910,12 +929,12 @@ function renderCommunityPosts() {
 
     if (state.communityPosts.length === 0) {
         feed.innerHTML = `
-                < div style = "height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;" >
+            <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;">
                 <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 20px; opacity: 0.5;"></i>
                 <h2>Aún no hay Reels</h2>
                 <p style="color: #888;">¡Sé el primero en compartir un momento regional!</p>
-            </div >
-                `;
+            </div>
+        `;
         return;
     }
     feed.innerHTML = state.communityPosts.map(post => {
@@ -924,7 +943,7 @@ function renderCommunityPosts() {
         const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
         return `
-                < div id = "post-${post.id}" class="tiktok-post" >
+            <div id="post-${post.id}" class="tiktok-post">
                     ${post.mediaUrl ? (
                 post.mediaType === 'video'
                     ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
