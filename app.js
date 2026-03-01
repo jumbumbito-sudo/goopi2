@@ -781,22 +781,41 @@ function viewDetails(postId) {
     const post = state.posts.find(p => p.id === postId);
     if (!post) return;
 
-    // Búsqueda flexible de campos de contacto (Meta, ACF o Raíz)
-    let whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || post.whatsapp || post.acf?.whatsapp || '';
-    let telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || post.telefono || post.acf?.telefono || post.telefono_contacto || '';
+    // Función auxiliar para buscar números en todo el objeto del Post (incluyendo ACF y Metadatos)
+    const findNumbersAnywhere = (obj) => {
+        const found = [];
+        const regex = /(?:\+?593|0)(?:[\s.-]?\d){8,9}/g;
 
-    // Si fallan los campos estructurados, intentamos extraer del contenido (Regex simple)
-    if (!telefono || !whatsapp) {
-        const content = post.content.rendered;
-        const phoneRegex = /(?:\+?593|0)9\d{8}|(?:\+?593|0)\d{1,2}\d{7}/g;
-        const foundNumbers = content.match(phoneRegex);
-        if (foundNumbers && foundNumbers.length > 0) {
-            if (!telefono) telefono = foundNumbers[0];
-            if (!whatsapp && foundNumbers[0].startsWith('09') || foundNumbers[0].startsWith('5939')) {
-                whatsapp = foundNumbers[0];
+        const search = (item) => {
+            if (typeof item === 'string') {
+                const matches = item.match(regex);
+                if (matches) matches.forEach(m => found.push(m.replace(/[\s.-]/g, '')));
+            } else if (typeof item === 'object' && item !== null) {
+                Object.values(item).forEach(search);
             }
-        }
+        };
+        search(obj);
+        return [...new Set(found)]; // Eliminar duplicados
+    };
+
+    const allFoundNumbers = findNumbersAnywhere(post);
+
+    // Intentamos asignar basados en prioridad
+    let telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || post.telefono || post.acf?.telefono || '';
+    let whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || post.whatsapp || post.acf?.whatsapp || '';
+
+    // Si no se encontraron por campos específicos, usamos los detectados en el contenido
+    if (!telefono && allFoundNumbers.length > 0) telefono = allFoundNumbers[0];
+    if (!whatsapp && allFoundNumbers.length > 0) {
+        // Buscamos uno que sea celular (empieza por 09 o +5939)
+        const activeCell = allFoundNumbers.find(n => n.startsWith('09') || n.startsWith('5939'));
+        whatsapp = activeCell || allFoundNumbers[0];
     }
+
+    // Limpiar para asegurar que sean solo dígitos para los enlaces (pero permitir el '+')
+    const cleanNum = (num) => num ? num.replace(/[^\d+]/g, '') : '';
+    telefono = cleanNum(telefono);
+    whatsapp = cleanNum(whatsapp);
 
     const overlay = document.getElementById('details-overlay');
     const content = document.getElementById('details-content');
@@ -864,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=36.7')
+            navigator.serviceWorker.register('./sw.js?v=37.1')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
