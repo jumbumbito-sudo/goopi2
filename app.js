@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.3)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.4)
  */
-console.log("🚀 GOOPIAPP VERSION 37.3 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.4 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -73,8 +73,23 @@ function syncFavorites(uid) {
     favRef.on('value', (snapshot) => {
         state.userFavorites = snapshot.val() || {};
         if (state.currentView === 'profile') {
-            const mainContent = document.querySelector('.main-content');
-            renderView('profile', mainContent);
+            const mainContent = document.getElementById('main-view');
+            if (mainContent) renderView('profile', mainContent);
+        }
+    });
+}
+
+function syncFollowing(uid) {
+    if (!db) return;
+    const followRef = db.ref('following/' + uid);
+    followRef.on('value', (snapshot) => {
+        state.userFollowing = snapshot.val() || {};
+        // Refrescamos vistas si es necesario
+        if (state.currentView === 'community') {
+            renderCommunityPosts();
+        } else if (state.currentView === 'profile') {
+            const mainContent = document.getElementById('main-view');
+            if (mainContent) renderView('profile', mainContent);
         }
     });
 }
@@ -1521,7 +1536,7 @@ async function toggleFollow(targetUserId, btn) {
     }
     if (!db) return alert("Error: Base de datos no inicializada");
 
-    const isFollowing = state.userFollowing && state.userFollowing[targetUserId];
+    const isFollowing = !!(state.userFollowing && state.userFollowing[targetUserId]);
     const followRef = db.ref(`following/${user.uid}/${targetUserId}`);
 
     btn.disabled = true;
@@ -1530,9 +1545,19 @@ async function toggleFollow(targetUserId, btn) {
     try {
         if (isFollowing) {
             await followRef.remove();
+            if (state.userFollowing) delete state.userFollowing[targetUserId];
         } else {
             await followRef.set(true);
+            if (!state.userFollowing) state.userFollowing = {};
+            state.userFollowing[targetUserId] = true;
         }
+
+        // Feedback visual inmediato
+        const isNowFollowing = !!(state.userFollowing && state.userFollowing[targetUserId]);
+        btn.innerText = isNowFollowing ? 'SIGUIENDO' : 'SEGUIR';
+        btn.style.background = isNowFollowing ? 'transparent' : 'var(--secondary-lilac)';
+        btn.classList.toggle('following', isNowFollowing);
+
     } catch (e) {
         console.error("Follow error:", e);
         if (e.message.includes("permission_denied")) {
