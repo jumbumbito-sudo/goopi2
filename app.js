@@ -800,19 +800,22 @@ function viewDetails(postId) {
 
     const allFoundNumbers = findNumbersAnywhere(post);
 
-    // Intentamos asignar basados en prioridad
+    // Búsqueda flexible de campos
     let telefono = post.meta?.telefono_contacto || post.acf?.telefono_contacto || post.telefono || post.acf?.telefono || '';
     let whatsapp = post.meta?.whatsapp_contacto || post.acf?.whatsapp_contacto || post.whatsapp || post.acf?.whatsapp || '';
+    let direccion = post.meta?.direccion || post.acf?.direccion || post.direccion || post.acf?.ubicacion || '';
 
-    // Si no se encontraron por campos específicos, usamos los detectados en el contenido
+    // Si fallan los campos estructurados, usamos los detectados vinculados al contenido
     if (!telefono && allFoundNumbers.length > 0) telefono = allFoundNumbers[0];
     if (!whatsapp && allFoundNumbers.length > 0) {
-        // Buscamos uno que sea celular (empieza por 09 o +5939)
         const activeCell = allFoundNumbers.find(n => n.startsWith('09') || n.startsWith('5939'));
         whatsapp = activeCell || allFoundNumbers[0];
     }
 
-    // Limpiar para asegurar que sean solo dígitos para los enlaces (pero permitir el '+')
+    // Guardar una versión visual para mostrar en texto
+    const displayPhone = telefono || (allFoundNumbers.length > 0 ? allFoundNumbers[0] : '');
+
+    // Limpiar para asegurar que sean solo dígitos para los enlaces
     const cleanNum = (num) => num ? num.replace(/[^\d+]/g, '') : '';
     telefono = cleanNum(telefono);
     whatsapp = cleanNum(whatsapp);
@@ -821,6 +824,17 @@ function viewDetails(postId) {
     const content = document.getElementById('details-content');
 
     let buttonsHtml = '';
+    let infoHtml = '';
+
+    // Generar bloque de información estructurada si hay datos
+    if (displayPhone || direccion) {
+        infoHtml = `
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 15px; border-radius: 20px; margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
+                ${displayPhone ? `<div style="display: flex; align-items: center; gap: 12px; color: white; font-size: 14px;"><i class="fas fa-phone-alt" style="color: var(--secondary-lilac); width: 20px;"></i> <b>Tel:</b> ${displayPhone}</div>` : ''}
+                ${direccion ? `<div style="display: flex; align-items: center; gap: 12px; color: white; font-size: 14px;"><i class="fas fa-map-marker-alt" style="color: var(--secondary-cyan); width: 20px;"></i> <b>Dirección:</b> ${direccion}</div>` : ''}
+            </div>
+        `;
+    }
 
     if (telefono) {
         buttonsHtml += `
@@ -850,6 +864,9 @@ function viewDetails(postId) {
     content.innerHTML = `
         <img src="${post._embedded?.['wp:featuredmedia']?.[0]?.source_url || ''}" style="width: 100%; border-radius: 24px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
         <h1 style="font-size: 28px; margin-bottom: 10px; color: var(--secondary-lilac); font-weight: 900;">${post.title.rendered}</h1>
+        
+        ${infoHtml}
+
         <div style="color: var(--text-dim); margin-bottom: 25px; line-height: 1.8; font-size: 15px;">
             ${post.content.rendered}
         </div>
@@ -883,7 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=37.1')
+            navigator.serviceWorker.register('./sw.js?v=37.2')
                 .then(reg => {
                     console.log('Goopi PWA: Service Worker Registered!');
                     reg.onupdatefound = () => {
