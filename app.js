@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.4)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.5)
  */
-console.log("🚀 GOOPIAPP VERSION 37.4 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.5 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -196,7 +196,7 @@ function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
     `;
 }
 
-function navigate(view) {
+function navigate(view, extra = null) {
     // Cerramos overlays activos si existen
     closeDetails();
     const searchOverlay = document.getElementById('search-overlay');
@@ -252,14 +252,14 @@ function navigate(view) {
     mainContent.style.transform = 'translateY(10px)';
 
     setTimeout(() => {
-        renderView(view, mainContent);
+        renderView(view, mainContent, extra);
         mainContent.style.opacity = '1';
         mainContent.style.transform = 'translateY(0)';
         window.scrollTo(0, 0);
     }, 150);
 }
 
-function renderView(view, container) {
+function renderView(view, container, extra = null) {
     switch (view) {
         case 'home':
             container.innerHTML = `
@@ -423,7 +423,7 @@ function renderView(view, container) {
                 <div id="locales-list" style="display: flex; flex-direction: column; gap: 18px;"></div>
             `;
             fetchCategories();
-            fetchLocales();
+            fetchLocales(extra);
             break;
 
         case 'login':
@@ -652,8 +652,10 @@ async function fetchHomeCategories() {
         const categories = await response.json();
         const grid = document.getElementById('home-categories-grid');
         if (categories && grid) {
-            grid.innerHTML = categories.map(cat => `
-                <button onclick="navigate('guide'); setTimeout(() => fetchLocales(${cat.id}), 300);" 
+            grid.innerHTML = categories
+                .filter(cat => cat.name.toLowerCase() !== 'noticias')
+                .map(cat => `
+                <button onclick="navigate('guide', ${cat.id})" 
                     style="background: var(--card-bg); border: 1px solid var(--glass-border); padding: 15px; border-radius: 18px; color: white; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
                     <i class="fas ${getCategoryIcon(cat.name)}" style="color: var(--secondary-lilac); font-size: 16px;"></i>
                     <span style="font-size: 10px; font-weight: 700; text-transform: uppercase;">${cat.name}</span>
@@ -687,7 +689,9 @@ async function fetchCategories() {
         const categories = await response.json();
         const grid = document.getElementById('categories-grid');
         if (grid) {
-            grid.innerHTML = categories.map(cat => `
+            grid.innerHTML = categories
+                .filter(cat => cat.name.toLowerCase() !== 'noticias')
+                .map(cat => `
                 <button onclick="fetchLocales(${cat.id})" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 15px; border-radius: 20px; color: white; cursor: pointer; display: flex; align-items: center; gap: 10px;">
                     <i class="fas ${getCategoryIcon(cat.name)}" style="color: var(--secondary-lilac); font-size: 14px;"></i>
                     <span style="font-size: 11px; font-weight: 700;">${cat.name}</span>
