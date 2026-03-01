@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.5)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.6)
  */
-console.log("🚀 GOOPIAPP VERSION 37.5 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.6 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -999,6 +999,11 @@ function renderCommunityPosts() {
             ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`
             }
                 
+                ${(user && post.userId === user.uid) ? `
+                <div class="post-owner-actions" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="position: absolute; top: 20px; right: 20px; z-index: 2000; background: rgba(255,59,48,0.3); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; backdrop-filter: blur(10px); cursor: pointer;">
+                    <i class="fas fa-trash-alt"></i>
+                </div>` : ''}
+
                 <div class="tiktok-actions">
                     <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
                         <i class="fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
@@ -1617,7 +1622,41 @@ async function updateProfilePhoto(input) {
     }
 }
 
-// --- BOOTSTRAP (v37.3) ---
+async function deletePost(postId, mediaUrl) {
+    if (!confirm("¿Seguro que quieres eliminar esta publicación? Esta acción no se puede deshacer.")) return;
+
+    try {
+        // 1. Eliminar de Realtime Database
+        await db.ref('posts/' + postId).remove();
+
+        // 2. Eliminar de Storage si tiene media
+        if (mediaUrl && mediaUrl.includes('firebasestorage')) {
+            try {
+                const storageRef = storage.refFromURL(mediaUrl);
+                await storageRef.delete();
+            } catch (e) {
+                console.warn("Media already deleted or path invalid in storage", e);
+            }
+        }
+
+        alert("Publicación eliminada correctamente.");
+
+        // 3. Actualizar UI
+        state.communityPosts = state.communityPosts.filter(p => p.id !== postId);
+        if (state.currentView === 'community') {
+            renderCommunityPosts();
+        } else if (state.currentView === 'profile') {
+            const mainContent = document.getElementById('main-view');
+            if (mainContent) renderView('profile', mainContent);
+        }
+
+    } catch (e) {
+        console.error("Error al eliminar post:", e);
+        alert("No se pudo eliminar la publicación: " + e.message);
+    }
+}
+
+// --- BOOTSTRAP (v37.6) ---
 initFirebase();
 initCommunity();
 navigate('home');
@@ -1633,6 +1672,6 @@ setTimeout(() => {
 // PWA Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=37.3');
+        navigator.serviceWorker.register('./sw.js?v=37.6');
     });
 }
