@@ -71,10 +71,9 @@ body {
 .main-content {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
-    padding-bottom: 100px;
-    /* Space for bottom nav */
+    padding: 20px 20px 100px; /* Space for bottom nav */
     scrollbar-width: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .main-content::-webkit-scrollbar {
@@ -205,43 +204,43 @@ body {
 /* Bottom Navigation */
 .bottom-nav {
     position: fixed;
-    /* Asegura que el nav siempre flote al fondo */
     bottom: 0;
     left: 0;
     right: 0;
-    height: 80px;
-    background: #05050a;
+    height: 75px;
+    background: rgba(10, 5, 20, 0.95);
     backdrop-filter: blur(20px);
-    border-top: 2px solid var(--secondary-lilac);
-    /* Refuerzo visual solicitado */
+    border-top: 1px solid var(--glass-border);
     display: flex;
     justify-content: space-around;
     align-items: center;
     padding: 0 10px;
     padding-bottom: env(safe-area-inset-bottom);
-    /* Fix para Notch de iPhone/Samsung */
     z-index: 3000;
-    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.5);
 }
 
 .nav-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     color: var(--text-dim);
     text-decoration: none;
-    font-size: 12px;
-    transition: color 0.3s;
+    font-size: 11px;
+    transition: all 0.3s;
     cursor: pointer;
+    flex: 1;
+    padding: 8px 0;
 }
 
 .nav-item.active {
     color: var(--secondary-lilac);
+    transform: translateY(-2px);
 }
 
 .nav-item i {
-    font-size: 20px;
+    font-size: 22px;
 }
 
 /* Details Overlay */

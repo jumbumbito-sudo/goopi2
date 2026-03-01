@@ -102,10 +102,10 @@ function syncGameStats(uid) {
 
 function updateHeader() {
     const user = auth ? auth.currentUser : null;
-    const userBtn = document.querySelector('button[onclick*="navigate(\'login\')"], button[onclick*="navigate(\'profile\')"]');
+    const userBtn = document.getElementById('header-user-btn');
     if (userBtn) {
+        userBtn.setAttribute('onclick', "navigate('profile')"); // Always profile
         if (user) {
-            userBtn.setAttribute('onclick', "navigate('profile')");
             if (user.photoURL) {
                 userBtn.innerHTML = `<img src="${user.photoURL}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--secondary-lilac);">`;
             } else {
@@ -113,7 +113,6 @@ function updateHeader() {
                 userBtn.style.color = "var(--secondary-lilac)";
             }
         } else {
-            userBtn.setAttribute('onclick', "navigate('profile')");
             userBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
             userBtn.style.color = "var(--secondary-cyan)";
         }
@@ -183,55 +182,54 @@ function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
 }
 
 function navigate(view) {
+    // Cerramos overlays activos si existen
+    closeDetails();
+    const searchOverlay = document.getElementById('search-overlay');
+    if (searchOverlay) searchOverlay.classList.remove('active');
+
+    // Actualizamos estado visual de la barra de navegación
     const navItems = document.querySelectorAll('.bottom-nav .nav-item');
     navItems.forEach(item => {
         item.classList.remove('active');
-        const textElement = item.querySelector('span');
-        if (textElement) {
-            const text = textElement.innerText.toLowerCase();
-            if (text.includes(view) || (view === 'home' && text === 'inicio') || (view === 'community' && text.includes('social')) || (view === 'guide' && text === 'guía')) {
-                item.classList.add('active');
-            }
+        if (item.getAttribute('data-view') === view) {
+            item.classList.add('active');
         }
     });
 
     const header = document.querySelector('.app-header');
     const nav = document.querySelector('.bottom-nav');
-    const mainContent = document.querySelector('.main-content');
+    const mainContent = document.getElementById('main-view');
 
-    if (view === 'taxi' || view === 'delivery' || view === 'community') {
-        if (header) header.style.setProperty('display', 'none', 'important');
-        if (nav) nav.style.setProperty('display', 'none', 'important');
+    // Reset de scroll al cambiar de vista
+    if (mainContent) mainContent.scrollTop = 0;
+
+    // Vistas Pantalla Completa (Sin Header/Nav)
+    const isFullScreen = ['taxi', 'delivery', 'community'].includes(view);
+
+    if (header) header.style.display = isFullScreen ? 'none' : 'flex';
+    if (nav) nav.style.display = isFullScreen ? 'none' : 'flex';
+
+    if (isFullScreen) {
         mainContent.style.padding = '0';
-        mainContent.style.marginTop = '0';
         mainContent.style.height = '100vh';
-        mainContent.style.width = '100vw';
         mainContent.style.position = 'fixed';
-        mainContent.style.top = '0';
-        mainContent.style.left = '0';
-        mainContent.style.zIndex = '1000';
-        mainContent.style.overflow = 'hidden';
     } else {
-        if (header) header.style.setProperty('display', 'flex', 'important');
-        if (nav) nav.style.setProperty('display', 'flex', 'important');
-        mainContent.style.padding = '20px 20px 110px 20px'; // Space for bottom nav
-        mainContent.style.marginTop = '0';
+        mainContent.style.padding = '20px 20px 100px';
         mainContent.style.height = 'auto';
-        mainContent.style.width = 'auto';
         mainContent.style.position = 'relative';
-        mainContent.style.top = 'auto';
-        mainContent.style.left = 'auto';
-        mainContent.style.zIndex = '1';
-        mainContent.style.overflow = 'auto';
     }
 
+    // Animación de salida y entrada
     mainContent.style.opacity = '0';
+    mainContent.style.transform = 'translateY(10px)';
+
     setTimeout(() => {
         renderView(view, mainContent);
         mainContent.style.opacity = '1';
-    }, 100);
-
-    state.currentView = view;
+        mainContent.style.transform = 'translateY(0)';
+        state.currentView = view;
+        window.scrollTo(0, 0);
+    }, 150);
 }
 
 function renderView(view, container) {
@@ -1608,3 +1606,7 @@ async function updateProfilePhoto(input) {
         avatarDiv.style.pointerEvents = "auto";
     }
 }
+
+// --- BOOTSTRAP ---
+initFirebase();
+navigate('home');
