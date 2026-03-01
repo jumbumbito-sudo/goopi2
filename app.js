@@ -680,10 +680,12 @@ async function fetchNews() {
     try {
         const response = await fetch(`${wpConfig.url}/wp/v2/local?categories=121895&_embed`);
         const locales = await response.json();
+        // Sincronizar con el estado global para que viewDetails pueda encontrarlas
+        state.posts = [...state.posts, ...locales];
         const list = document.getElementById('news-list');
         if (list) {
             list.innerHTML = locales.map(item => `
-                <div class="business-card" style="display: block; padding: 0; overflow: hidden; border-radius: 24px;">
+                <div class="business-card" style="display: block; padding: 0; overflow: hidden; border-radius: 24px;" onclick="viewDetails(${item.id})">
                     <img src="${item._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/400'}" style="width: 100%; height: 180px; object-fit: cover;">
                     <div style="padding: 18px;">
                         <h3 style="color: var(--secondary-lilac);">${item.title.rendered}</h3>
