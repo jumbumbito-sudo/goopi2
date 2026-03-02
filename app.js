@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.7)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.8)
  */
-console.log("🚀 GOOPIAPP VERSION 37.7 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.8 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -999,12 +999,12 @@ function renderCommunityPosts() {
             ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`
             }
                 
-                ${(user && post.userId === user.uid) ? `
-                <div class="post-owner-actions" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="position: absolute; top: 65px; right: 20px; z-index: 2000; background: rgba(255,59,48,0.3); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; backdrop-filter: blur(10px); cursor: pointer;">
-                    <i class="fas fa-trash-alt"></i>
-                </div>` : ''}
-
                 <div class="tiktok-actions">
+                    ${(user && post.userId === user.uid) ? `
+                    <div class="action-item" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="background: rgba(255, 59, 48, 0.4); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; opacity: 1; border: 1px solid rgba(255,255,255,0.2);">
+                        <i class="fas fa-trash-alt" style="color: white; font-size: 18px;"></i>
+                    </div>` : ''}
+
                     <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
                         <i class="fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
                     </div>
@@ -1656,7 +1656,7 @@ async function deletePost(postId, mediaUrl) {
     }
 }
 
-// --- BOOTSTRAP (v37.6) ---
+// --- BOOTSTRAP (v37.8) ---
 initFirebase();
 initCommunity();
 navigate('home');
@@ -1672,6 +1672,6 @@ setTimeout(() => {
 // PWA Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=37.6');
+        navigator.serviceWorker.register('./sw.js?v=37.8');
     });
 }
