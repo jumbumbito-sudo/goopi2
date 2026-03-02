@@ -144,6 +144,7 @@ const adImages = [
 ];
 
 const categoryIcons = {
+    'negocios': 'fa-briefcase',
     'gastronomia': 'fa-utensils',
     'alimentacion': 'fa-hamburger',
     'hospedaje': 'fa-bed',
