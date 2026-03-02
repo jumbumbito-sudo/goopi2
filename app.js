@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.9)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v38.0)
  */
-console.log("🚀 GOOPIAPP VERSION 37.9 LOADED");
+console.log("🚀 GOOPIAPP VERSION 38.0 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -1656,7 +1656,7 @@ async function deletePost(postId, mediaUrl) {
     }
 }
 
-// --- BOOTSTRAP (v37.9) ---
+// --- BOOTSTRAP (v38.0) ---
 initFirebase();
 initCommunity();
 navigate('home');
@@ -1672,6 +1672,6 @@ setTimeout(() => {
 // PWA Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=37.9');
+        navigator.serviceWorker.register('./sw.js?v=38.0');
     });
 }
