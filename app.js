@@ -1,7 +1,7 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.8)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v37.9)
  */
-console.log("🚀 GOOPIAPP VERSION 37.8 LOADED");
+console.log("🚀 GOOPIAPP VERSION 37.9 LOADED");
 
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
@@ -1001,8 +1001,8 @@ function renderCommunityPosts() {
                 
                 <div class="tiktok-actions">
                     ${(user && post.userId === user.uid) ? `
-                    <div class="action-item" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="background: rgba(255, 59, 48, 0.4); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; opacity: 1; border: 1px solid rgba(255,255,255,0.2);">
-                        <i class="fas fa-trash-alt" style="color: white; font-size: 18px;"></i>
+                    <div class="action-item" onclick="event.stopPropagation(); deletePost('${post.id}', '${post.mediaUrl}')" style="opacity: 1;">
+                        <i class="fas fa-trash-alt" style="color: white; font-size: 20px;"></i>
                     </div>` : ''}
 
                     <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
@@ -1656,7 +1656,7 @@ async function deletePost(postId, mediaUrl) {
     }
 }
 
-// --- BOOTSTRAP (v37.8) ---
+// --- BOOTSTRAP (v37.9) ---
 initFirebase();
 initCommunity();
 navigate('home');
@@ -1672,6 +1672,6 @@ setTimeout(() => {
 // PWA Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=37.8');
+        navigator.serviceWorker.register('./sw.js?v=37.9');
     });
 }
