@@ -869,7 +869,13 @@ function closePopup() {
     const popup = document.getElementById('dynamic-popup');
     if (popup) {
         popup.classList.remove('active');
-        setTimeout(() => popup.remove(), 400);
+        setTimeout(() => {
+            popup.remove();
+            // Si el usuario está logueado y tiene intentos, mostrar juego después de cerrar el banner
+            if (auth && auth.currentUser && state.dailyAttempts > 0) {
+                showMinesGame();
+            }
+        }, 400);
     }
 }
 
@@ -1092,14 +1098,14 @@ function renderCommunityPosts() {
                     <div class="tiktok-info" onclick="event.stopPropagation()">
                         <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                                <div onclick="viewUserProfile('${post.userId}')" style="width: 40px; height: 40px; border-radius: 50%; background: var(--secondary-lilac); border: 2px solid white; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;">
+                                <div onclick="event.stopPropagation(); viewUserProfile('${post.userId}')" style="width: 40px; height: 40px; border-radius: 50%; background: var(--secondary-lilac); border: 2px solid white; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;">
                                     ${(user && post.userId === user.uid && user.photoURL)
                 ? `<img src="${user.photoURL}" style="width: 100%; height: 100%; object-fit: cover;">`
                 : (post.userPhoto ? `<img src="${post.userPhoto}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-astronaut" style="color: white; font-size: 18px;"></i>`)}
                                 </div>
                                 ${(user && user.uid !== post.userId) ? `<button onclick="event.stopPropagation(); toggleFollow('${post.userId}', this)" class="follow-btn ${state.userFollowing && state.userFollowing[post.userId] ? 'following' : ''}" style="background: ${state.userFollowing && state.userFollowing[post.userId] ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">${state.userFollowing && state.userFollowing[post.userId] ? 'Siguiendo' : 'Seguir'}</button>` : ''}
                             </div>
-                            <div onclick="viewUserProfile('${post.userId}')" class="user-tag" style="margin-bottom: 0; font-size: 18px; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1); cursor: pointer;">@${post.userName.replace(/\s+/g, '').toLowerCase()}</div>
+                            <div onclick="event.stopPropagation(); viewUserProfile('${post.userId}')" class="user-tag" style="margin-bottom: 0; font-size: 18px; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1); cursor: pointer;">@${post.userName.toString().replace(/\s+/g, '').toLowerCase()}</div>
                         </div>
                         <div class="post-desc">${post.text || ''}</div>
                     </div>
@@ -1888,11 +1894,9 @@ navigate('home');
 checkDynamicPopup();
 
 // Mostrar Juego de Minas si hay intentos y está logueado
-setTimeout(() => {
-    if (auth && auth.currentUser && state.dailyAttempts > 0) {
-        showMinesGame();
-    }
-}, 4000);
+// NOTA: El Juego de Minas ya NO salta de forma automática por petición del usuario.
+// Solo se accede a él haciendo clic en el botón de 'Puntos Gooper' en el perfil o sección correspondiente.
+// El temporizador de 10s se ha eliminado.
 
 // Capacitor Back Button Integration
 if (window.Capacitor) {
