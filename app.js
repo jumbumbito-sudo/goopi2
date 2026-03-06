@@ -19,7 +19,8 @@ const state = {
     dailyAttempts: 3,
     lastGameDate: null,
     targetProfileId: null, // UID of the profile being viewed
-    isMuted: true
+    isMuted: true,
+    navigationHistory: []
 };
 
 // Firebase Safe-Initialization
@@ -197,7 +198,14 @@ function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
     `;
 }
 
-function navigate(view, extra = null) {
+function navigate(view, extra = null, isBack = false) {
+    // Si no es un retroceso, guardamos la vista actual en el historial
+    if (!isBack && state.currentView !== view) {
+        state.navigationHistory.push(state.currentView);
+        // Limitamos el historial a 15 entradas
+        if (state.navigationHistory.length > 15) state.navigationHistory.shift();
+    }
+
     // Cerramos overlays activos si existen
     closeDetails();
     const searchOverlay = document.getElementById('search-overlay');
@@ -222,8 +230,13 @@ function navigate(view, extra = null) {
     // Vistas Pantalla Completa (Sin Header/Nav)
     const isFullScreen = ['taxi', 'delivery', 'community'].includes(view);
 
-    // Actualizamos estado inmediatamente para evitar fallos en initCommunity
+    // Actualizamos estado inmediatamente
     state.currentView = view;
+
+    // Si navegamos a nuestro propio perfil o a cualquier otra sección principal, limpiamos el perfil externo
+    if (view !== 'profile' || (view === 'profile' && extra === null)) {
+        state.targetProfileId = null;
+    }
 
     if (header) header.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
     if (nav) nav.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
@@ -258,6 +271,54 @@ function navigate(view, extra = null) {
         mainContent.style.transform = 'translateY(0)';
         window.scrollTo(0, 0);
     }, 150);
+}
+
+// Handler para el botón de atrás (Físico/Barra)
+function handleBackButton() {
+    // 1. Cerrar overlays prioritarios
+    const details = document.getElementById('details-overlay');
+    if (details && details.classList.contains('active')) {
+        closeDetails();
+        return;
+    }
+
+    const search = document.getElementById('search-overlay');
+    if (search && search.classList.contains('active')) {
+        toggleSearch();
+        return;
+    }
+
+    const userSearch = document.getElementById('user-search-overlay');
+    if (userSearch && userSearch.classList.contains('active')) {
+        userSearch.classList.remove('active');
+        return;
+    }
+
+    const comments = document.querySelector('.comment-sheet');
+    if (comments && comments.classList.contains('active')) {
+        comments.classList.remove('active');
+        setTimeout(() => comments.remove(), 400);
+        return;
+    }
+
+    const mines = document.getElementById('mines-game-overlay');
+    if (mines) {
+        closeMinesGame();
+        return;
+    }
+
+    // 2. Navegar hacia atrás en el stack
+    if (state.navigationHistory.length > 0) {
+        const prevView = state.navigationHistory.pop();
+        navigate(prevView, null, true);
+    } else if (state.currentView !== 'home') {
+        navigate('home');
+    } else {
+        // En Home, cerramos la app (Capacitor)
+        if (window.Capacitor && window.Capacitor.Plugins.App) {
+            window.Capacitor.Plugins.App.exitApp();
+        }
+    }
 }
 
 function renderView(view, container, extra = null) {
@@ -392,9 +453,9 @@ function renderView(view, container, extra = null) {
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     
-                    <!-- MAPA FONDO (Subido +850px y recortado inferior para ocultar Mapbox y mostrar Banner completo) -->
+                    <!-- MAPA FONDO (Ajustado para ocultar solo el encabezado) -->
                     <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 950px); border: none; position: absolute; top: -850px; left: 0;" 
+                            style="width: 100%; height: calc(100% + 550px); border: none; position: absolute; top: -450px; left: 0;" 
                             allow="geolocation">
                     </iframe>
                 </div>
@@ -539,6 +600,11 @@ function renderView(view, container, extra = null) {
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-hashtag" style="color: var(--secondary-lilac);"></i>
                         <input type="number" id="driver-unit" placeholder="Número de unidad" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                    </div>
+
+                    <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
+                        <i class="fab fa-whatsapp" style="color: #25D366;"></i>
+                        <input type="tel" id="driver-phone" placeholder="Número de WhatsApp (ej: 0912345678)" style="background: none; border: none; color: white; width: 100%; outline: none;">
                     </div>
 
                     <button onclick="handleDriverRegistration(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; border-radius: 18px; box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);">
@@ -992,7 +1058,7 @@ function renderCommunityPosts() {
         const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
         return `
-            <div id="post-${post.id}" class="tiktok-post">
+            <div id="post-${post.id}" class="tiktok-post" data-user-id="${post.userId}">
                     ${post.mediaUrl ? (
                 post.mediaType === 'video'
                     ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
@@ -1104,10 +1170,10 @@ function showComments(postId) {
     const comments = post.comments ? Object.values(post.comments) : [];
 
     sheet.innerHTML = `
-                < div style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;" >
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <h3 style="color:white; margin:0;">Comentarios (${comments.length})</h3>
             <button onclick="this.closest('.comment-sheet').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-times"></i></button>
-        </div >
+        </div>
         <div class="comment-list">
             ${comments.length > 0 ? comments.map(c => `
                 <div class="comment-item">
@@ -1128,7 +1194,7 @@ function showComments(postId) {
             <input type="text" id="new-comment-text" placeholder="Escribe un comentario...">
             <button onclick="sendComment('${postId}')" style="background:var(--secondary-lilac); border:none; color:white; width:45px; height:45px; border-radius:50%;"><i class="fas fa-paper-plane"></i></button>
         </div>
-            `;
+    `;
 
     document.body.appendChild(sheet);
     setTimeout(() => sheet.classList.add('active'), 10);
@@ -1145,7 +1211,7 @@ async function sendComment(postId) {
     btn.disabled = true;
 
     try {
-        const commentRef = db.ref(`posts / ${postId}/comments`).push();
+        const commentRef = db.ref(`posts/${postId}/comments`).push();
         await commentRef.set({
             userId: auth.currentUser.uid,
             userName: auth.currentUser.displayName || 'Gooper',
@@ -1344,11 +1410,12 @@ async function handleDriverRegistration(btn) {
     const coop = document.getElementById('driver-coop').value;
     const unit = document.getElementById('driver-unit').value;
 
-    // Si no está logueado, necesitamos email/pass
     const emailInput = document.getElementById('driver-email');
     const passInput = document.getElementById('driver-password');
+    const phoneInput = document.getElementById('driver-phone');
+    const phone = phoneInput ? phoneInput.value.trim() : "";
 
-    if (!coop || !unit) return alert("La cooperativa y número de unidad son obligatorios");
+    if (!coop || !unit || !phone) return alert("La cooperativa, número de unidad y teléfono son obligatorios");
 
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> REGISTRANDO...`;
@@ -1356,14 +1423,37 @@ async function handleDriverRegistration(btn) {
     try {
         let user = auth.currentUser;
 
-        // Si no hay usuario, intentamos crear uno nuevo
+        // Si no hay usuario, intentamos crear uno nuevo o verificamos el existente
+        let emailToCheck = user ? user.email : emailInput.value.trim().toLowerCase();
+
+        if (!emailToCheck) {
+            btn.disabled = false;
+            btn.innerText = "FINALIZAR REGISTRO";
+            return alert("Por favor ingresa un correo para verificar tu registro.");
+        }
+
+        // --- VALIDACIÓN DE WHITELIST (GOOGLE FORMS) ---
+        // Verificamos si el correo está en la colección 'autorizados' (alimentada por Google Forms)
+        const authDoc = await fs.collection('autorizados').doc(emailToCheck).get();
+        if (!authDoc.exists) {
+            // También probamos con búsqueda por campo por si acaso
+            const authSnapshot = await fs.collection('autorizados').where('email', '==', emailToCheck).get();
+            if (authSnapshot.empty) {
+                alert("❌ ACCESO RESTRINGIDO: Tu correo no figura en la lista de conductores pre-inscritos vía Google Forms. Por favor, inscríbete primero.");
+                btn.disabled = false;
+                btn.innerText = "FINALIZAR REGISTRO";
+                return;
+            }
+        }
+        // ----------------------------------------------
+
         if (!user) {
             const email = emailInput.value;
             const password = passInput.value;
             if (!email || !password) {
                 btn.disabled = false;
                 btn.innerText = "FINALIZAR REGISTRO";
-                return alert("Por favor ingresa un correo y contraseña para crear tu cuenta Gooper");
+                return alert("Por favor ingresa correo y contraseña para crear tu cuenta Gooper.");
             }
 
             try {
@@ -1371,7 +1461,7 @@ async function handleDriverRegistration(btn) {
                 user = result.user;
             } catch (e) {
                 if (e.code === 'auth/email-already-in-use') {
-                    alert("Este correo ya está registrado en Goopi. Por favor, INICIA SESIÓN primero y luego vuelve aquí para registrar tu unidad.");
+                    alert("Este correo ya tiene cuenta. Inicia sesión y vuelve aquí.");
                     navigate('login');
                     return;
                 }
@@ -1386,6 +1476,7 @@ async function handleDriverRegistration(btn) {
             rol: finalRole,
             cooperativa: coop,
             unidad: unit,
+            telefono: phone,
             habilitado: false, // Requerido por reglas para 'create'
             bloqueadoAdmin: false, // Requerido por reglas para 'create'
             activo: false,
@@ -1456,7 +1547,21 @@ async function handleSearch(event) {
 // --- SOCIAL ENHANCEMENTS ---
 function viewUserProfile(uid) {
     state.targetProfileId = uid;
-    navigate('profile');
+    navigate('profile', uid);
+}
+
+function focusOnUserPosts(uid) {
+    if (state.currentView !== 'community') navigate('community');
+
+    setTimeout(() => {
+        const feed = document.getElementById('community-feed');
+        if (!feed) return;
+
+        const target = feed.querySelector(`.tiktok-post[data-user-id="${uid}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, 800);
 }
 
 function showUserSearch() {
@@ -1623,6 +1728,125 @@ async function updateProfilePhoto(input) {
     }
 }
 
+// --- MINES GAME LOGIC (Restored v38.0) ---
+let gameActive = false;
+let currentMines = [];
+let revealedCount = 0;
+let potentialWin = 0;
+
+function showMinesGame() {
+    if (gameActive) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'mines-overlay';
+    overlay.id = 'mines-game-overlay';
+
+    // Generar 3 minas aleatorias en un tablero de 25
+    currentMines = [];
+    while (currentMines.length < 3) {
+        let r = Math.floor(Math.random() * 25);
+        if (!currentMines.includes(r)) currentMines.push(r);
+    }
+
+    revealedCount = 0;
+    potentialWin = 0;
+    gameActive = true;
+
+    overlay.innerHTML = `
+        <div class="mines-container">
+            <h2 style="color:white; margin-bottom:10px;">Minas Goopi</h2>
+            <p style="color:var(--secondary-lilac); font-size:12px; margin-bottom:20px;">¡Encuentra diamantes y gana puntos! Tienes ${state.dailyAttempts} intentos hoy.</p>
+            
+            <div class="mines-stats">
+                <div style="text-align:left;"><span style="color:var(--text-dim); font-size:10px;">GANANCIA</span><br><b id="potential-win" style="color:#ffd700;">+0</b></div>
+                <div style="text-align:right;"><span style="color:var(--text-dim); font-size:10px;">INTENTOS</span><br><b style="color:white;">${state.dailyAttempts}</b></div>
+            </div>
+
+            <div class="mines-grid" id="mines-grid">
+                ${Array(25).fill(0).map((_, i) => `<div class="mine-cell" onclick="handleMineClick(${i}, this)"><i class="fas fa-gem" style="opacity:0;"></i></div>`).join('')}
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button id="cashout-btn" onclick="cashoutGame()" class="mines-btn mines-btn-cashout" style="display:none;">RETIRAR PUNTOS</button>
+                <button onclick="closeMinesGame()" class="mines-btn" style="background:rgba(255,255,255,0.1); color:white;">SALIR</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+window.handleMineClick = async (index, cell) => {
+    if (!gameActive || cell.classList.contains('revealed')) return;
+
+    cell.classList.add('revealed');
+
+    if (currentMines.includes(index)) {
+        // BOOM
+        gameActive = false;
+        cell.classList.add('revealed-mine');
+        cell.innerHTML = '<i class="fas fa-bomb"></i>';
+
+        // Revelar todas las minas
+        setTimeout(() => {
+            currentMines.forEach(m => {
+                const c = document.getElementById('mines-grid').children[m];
+                c.classList.add('revealed-mine');
+                c.innerHTML = '<i class="fas fa-bomb"></i>';
+            });
+
+            // Restar intento
+            state.dailyAttempts--;
+            if (auth && auth.currentUser) {
+                db.ref('gameStats/' + auth.currentUser.uid).update({
+                    attempts: state.dailyAttempts,
+                    lastDate: new Date().toLocaleDateString()
+                });
+            }
+
+            alert("¡BOOM! Has perdido. Te quedan " + state.dailyAttempts + " intentos.");
+            setTimeout(closeMinesGame, 2000);
+        }, 500);
+
+    } else {
+        // DIAMANTE
+        cell.classList.add('revealed-diamond');
+        cell.innerHTML = '<i class="fas fa-gem"></i>';
+        revealedCount++;
+        potentialWin += (10 * revealedCount);
+
+        document.getElementById('potential-win').innerText = `+${potentialWin}`;
+        document.getElementById('cashout-btn').style.display = 'block';
+
+        if (revealedCount === 22) cashoutGame(); // Win All
+    }
+};
+
+window.cashoutGame = async () => {
+    if (!gameActive) return;
+    gameActive = false;
+
+    state.userPoints += potentialWin;
+    state.dailyAttempts--;
+
+    if (auth && auth.currentUser) {
+        await db.ref('gameStats/' + auth.currentUser.uid).update({
+            points: state.userPoints,
+            attempts: state.dailyAttempts,
+            lastDate: new Date().toLocaleDateString()
+        });
+    }
+
+    alert(`¡FELICIDADES! Has ganado ${potentialWin} puntos.`);
+    closeMinesGame();
+};
+
+function closeMinesGame() {
+    gameActive = false;
+    const overlay = document.getElementById('mines-game-overlay');
+    if (overlay) overlay.remove();
+}
+
 async function deletePost(postId, mediaUrl) {
     if (!confirm("¿Seguro que quieres eliminar esta publicación? Esta acción no se puede deshacer.")) return;
 
@@ -1669,6 +1893,14 @@ setTimeout(() => {
         showMinesGame();
     }
 }, 4000);
+
+// Capacitor Back Button Integration
+if (window.Capacitor) {
+    const { App } = window.Capacitor.Plugins;
+    App.addListener('backButton', () => {
+        handleBackButton();
+    });
+}
 
 // PWA Registration
 if ('serviceWorker' in navigator) {
