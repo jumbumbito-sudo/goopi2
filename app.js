@@ -1,8 +1,10 @@
 /**
- * GoopiApp - Core Logic (Tokyo Midnight Pro Edition v38.0)
+ * GoopiApp - Core Logic (Tokyo Midnight Pro Edition)
  */
-console.log("🚀 GOOPIAPP VERSION 38.0 LOADED");
+console.log("🚀 GOOPIAPP INITIALIZED");
 
+// ADVERTENCIA DE SEGURIDAD: Estas credenciales deberían ser manejadas por un proxy/backend seguro
+// en producción para evitar la exposición del appPassword.
 const wpConfig = {
     url: "https://goopiapp.com/wp-json",
     user: "jumbumbito@gmail.com",
@@ -13,15 +15,82 @@ const state = {
     currentView: 'home',
     posts: [],
     communityPosts: [],
+    socialAds: [],
     userFavorites: {},
     userFollowing: {},
-    userPoints: 100,
-    dailyAttempts: 3,
+    userPoints: 1000,
+    redDiamonds: 0,
+    dailyPoints: 1000,
+    streak: 0,
+    lastStreakDate: null,
+    rewardClaimedToday: false,
     lastGameDate: null,
     targetProfileId: null, // UID of the profile being viewed
     isMuted: true,
-    navigationHistory: []
+    navigationHistory: [],
+    userChats: {},
+    activeChatMessages: []
 };
+
+// --- FUNCIÓN PUBLICIDAD SOCIAL DESDE WORDPRESS ---
+async function fetchSocialAds() {
+    try {
+        const response = await fetch(`${wpConfig.url}/wp/v2/pages?slug=publicidad-social&_embed&t=${Date.now()}`);
+        const data = await response.json();
+        if (data && data.length > 0 && data[0].content && data[0].content.rendered) {
+            const html = data[0].content.rendered;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            const ads = [];
+            
+            // Parse Images
+            tempDiv.querySelectorAll('img').forEach(img => {
+                if (img.src) ads.push({ type: 'image', url: img.src });
+            });
+            
+            // Parse Videos 
+            tempDiv.querySelectorAll('video').forEach(vid => {
+                if (vid.src) ads.push({ type: 'video', url: vid.src });
+                else {
+                    const src = vid.querySelector('source');
+                    if (src && src.src) ads.push({ type: 'video', url: src.src });
+                }
+            });
+            
+            // Parse Iframes (e.g. VideoPress, YouTube)
+            tempDiv.querySelectorAll('iframe').forEach(ifr => {
+                if (ifr.src) {
+                    let finalUrl = ifr.src;
+                    if (finalUrl.includes('?')) {
+                        finalUrl += '&autoplay=1&loop=1&muted=1&controls=0&playsinline=1';
+                    } else {
+                        finalUrl += '?autoplay=1&loop=1&muted=1&controls=0&playsinline=1';
+                    }
+                    ads.push({ type: 'iframe', url: finalUrl });
+                }
+            });
+            
+            // Link a videos sueltos
+            tempDiv.querySelectorAll('a').forEach(a => {
+                if (a.href && a.href.toLowerCase().endsWith('.mp4') && !ads.some(ad => ad.url === a.href)) {
+                    ads.push({ type: 'video', url: a.href });
+                }
+            });
+            
+            // Mezclarlos para variar la publicidad
+            state.socialAds = ads.sort(() => Math.random() - 0.5);
+            console.log("🔥 Social Ads Cargados (Desde WP): ", state.socialAds.length);
+            if (state.currentView === 'community') {
+                renderCommunityPosts();
+            }
+        }
+    } catch (e) {
+        console.error("Error al cargar Publicidad Social", e);
+    }
+}
+fetchSocialAds(); // Disparar la extraccion al inicio del app
+
 
 // Firebase Safe-Initialization
 let auth = null;
@@ -34,7 +103,7 @@ function initFirebase() {
     if (typeof firebase !== 'undefined') {
         try {
             const firebaseConfig = {
-                apiKey: "AIzaSyDFwLeYPqT9gMcACGCa_PAU7CNO52wZFs0",
+                apiKey: "AIzaSyDViqhxvs5nRavt9OhlVGZV43GvRqJHlYo",
                 authDomain: "taxi-macas-52717.firebaseapp.com",
                 databaseURL: "https://taxi-macas-52717-default-rtdb.firebaseio.com",
                 projectId: "taxi-macas-52717",
@@ -51,16 +120,30 @@ function initFirebase() {
             fs = firebase.firestore();
             auth.onAuthStateChanged((user) => {
                 if (user) {
+                    state.syncing = true;
                     syncFavorites(user.uid);
                     syncFollowing(user.uid);
                     syncGameStats(user.uid);
+                    syncUserChats(user.uid);
                 } else {
                     state.userFavorites = {};
                     state.userFollowing = {};
-                    state.dailyAttempts = 3;
+                    state.userPoints = 0;
+                    state.redDiamonds = 0;
                 }
                 updateHeader();
             });
+
+            // Capturar resultado de redirecciones pendientes (Login con Google)
+            auth.getRedirectResult().then(result => {
+                if (result.user) {
+                    console.log("🔥 Redirect Login Success:", result.user.email);
+                    updateHeader();
+                    if (state.currentView === 'login' || state.currentView === 'profile') {
+                        navigate('home');
+                    }
+                }
+            }).catch(e => console.error("Redirect Error:", e));
             firebaseError = false;
         } catch (e) {
             console.error("Firebase Error:", e);
@@ -99,21 +182,177 @@ function syncGameStats(uid) {
     const gameRef = db.ref('gameStats/' + uid);
     gameRef.on('value', (snapshot) => {
         const data = snapshot.val();
-        const today = new Date().toLocaleDateString();
+        const todayRaw = new Date();
+        const today = todayRaw.toLocaleDateString();
+        
+        // Calcular ayer
+        const yesterdayRaw = new Date();
+        yesterdayRaw.setDate(yesterdayRaw.getDate() - 1);
+        const yesterday = yesterdayRaw.toLocaleDateString();
 
         if (data) {
-            if (data.points !== undefined) state.userPoints = data.points;
+            state.redDiamonds = data.redDiamonds || 0;
+            state.streak = data.streak || 0;
+            state.lastStreakDate = data.lastStreakDate || null;
 
-            if (data.lastDate === today) {
-                state.dailyAttempts = data.attempts !== undefined ? data.attempts : 3;
-            } else {
-                state.dailyAttempts = 3;
+            // Manejo de puntos (Acumulativos, NO resetear)
+            state.userPoints = data.points !== undefined ? data.points : 1000;
+            
+            // Si es un nuevo día, actualizamos la fecha sin tocar los puntos
+            if (data.lastDate !== today) {
+                db.ref('gameStats/' + uid).update({
+                    lastDate: today
+                });
             }
+
+            // Manejo de RACHAS
+            if (state.lastStreakDate !== today) {
+                let newStreak = 1;
+                if (state.lastStreakDate === yesterday) {
+                    newStreak = state.streak + 1;
+                }
+                
+                state.streak = newStreak;
+                state.lastStreakDate = today;
+                
+                db.ref('gameStats/' + uid).update({
+                    streak: newStreak,
+                    lastStreakDate: today
+                });
+
+                // Mostrar recompensa si es primer login del día
+                setTimeout(() => showDailyReward(newStreak), 2000);
+            }
+
+        } else {
+            // Primer ingreso
+            state.userPoints = 1000;
+            state.redDiamonds = 0;
+            state.streak = 1;
+            state.lastStreakDate = today;
+            
+            db.ref('gameStats/' + uid).set({
+                points: 1000,
+                redDiamonds: 0,
+                streak: 1,
+                lastStreakDate: today,
+                lastDate: today
+            });
+            
+            setTimeout(() => showDailyReward(1), 2000);
         }
 
         const pointsEl = document.getElementById('points-display-total');
         if (pointsEl) pointsEl.innerText = state.userPoints;
+        
+        const redDiamondsEl = document.getElementById('red-diamonds-display');
+        if (redDiamondsEl) redDiamondsEl.innerText = state.redDiamonds;
+
+        updateHeader(); // Asegura que el fuego de la racha se actualice
     });
+}
+
+function showDailyReward(streak) {
+    const bonus = 500 + (streak * 100); // 500 base + 100 por cada día de racha
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'reward-overlay active';
+    overlay.innerHTML = `
+        <div class="reward-content">
+            <div class="reward-fire">
+                <i class="fas fa-fire streak-fire-${Math.min(streak, 10)}"></i>
+            </div>
+            <h2>¡RACHA DE ${streak} DÍAS!</h2>
+            <p>Has ganado un bonus diario por volver a Goopi.</p>
+            <div class="reward-amount">+${bonus} <span style="font-size:14px; color:var(--accent-orange);">PTS</span></div>
+            <button class="reward-btn" onclick="claimReward(${bonus})">¡GENIAL!</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // Confeti simple (Emoji)
+    for(let i=0; i<15; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-emoji';
+        p.innerText = '🔥';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.animationDuration = (Math.random() * 3 + 2) + 's';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 5000);
+    }
+}
+
+function claimReward(amount) {
+    const user = auth.currentUser;
+    if (!user || !db) return;
+
+    const newPoints = state.userPoints + amount;
+    db.ref('gameStats/' + user.uid).update({
+        points: newPoints
+    });
+
+    const overlay = document.querySelector('.reward-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 400);
+    }
+}
+
+function syncUserChats(uid) {
+    if (!db) return;
+    const chatsRef = db.ref('userChats/' + uid);
+    chatsRef.on('value', (snapshot) => {
+        state.userChats = snapshot.val() || {};
+        
+        // Update header icon for unread messages
+        const totalUnread = Object.values(state.userChats).reduce((acc, chat) => acc + (chat.unread || 0), 0);
+        const msgBtn = document.getElementById('header-msg-btn');
+        if (msgBtn) {
+            if (totalUnread > 0) {
+                msgBtn.innerHTML = `<i class="fas fa-comment-dots" style="color:var(--secondary-lilac);"></i><span style="position:absolute; top:-5px; right:-5px; background:#ff2d55; color:white; border-radius:10px; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800; border:2px solid var(--bg-dark);">${totalUnread}</span>`;
+            } else {
+                msgBtn.innerHTML = `<i class="far fa-comment-dots"></i>`;
+            }
+        }
+
+        if (state.currentView === 'messages') {
+            const mainContent = document.getElementById('main-view');
+            if (mainContent) renderView('messages', mainContent);
+        }
+    });
+}
+
+function showStreakInfo() {
+    const streak = state.streak;
+    const overlay = document.createElement('div');
+    overlay.id = 'streak-info-overlay';
+    overlay.className = 'reward-overlay active'; // Reutilizamos estilos de overlay
+    
+    // Calcular cuánto falta para el siguiente nivel de fuego
+    const nextMilestone = Math.ceil((streak + 1) / 5) * 5;
+    const daysLeft = nextMilestone - streak;
+
+    overlay.innerHTML = `
+        <div class="reward-content" style="background: linear-gradient(135deg, #1a0b2e 0%, #2d1b4d 100%); border-color: #ff8c00; box-shadow: 0 0 30px rgba(255, 140, 0, 0.3);">
+            <div class="reward-fire" style="font-size: 60px;">
+                <i class="fas fa-fire streak-fire-${Math.min(streak, 10)}"></i>
+            </div>
+            <h2 style="color: #ff8c00; font-size: 28px;">¡ESTÁS ON FIRE!</h2>
+            <p style="color: #fff; font-size: 16px; margin: 15px 0;">Llevas <b>${streak} ${streak === 1 ? 'día' : 'días'}</b> seguidos entrando a Goopi.</p>
+            
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 20px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1);">
+                <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">TU PRÓXIMO LOGRO</p>
+                <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; margin-bottom: 10px;">
+                    <div style="width: ${(streak % 5) * 20 || 100}%; height: 100%; background: linear-gradient(to right, #ff8c00, #ff2d55); border-radius: 10px;"></div>
+                </div>
+                <p style="font-size: 11px; color: #ffcc00;">${daysLeft > 0 ? `Faltan ${daysLeft} días para subir de nivel de fuego` : '¡Nivel máximo alcanzado!'}</p>
+            </div>
+
+            <button class="reward-btn" onclick="document.getElementById('streak-info-overlay').remove()" style="background: #ff8c00;">¡A DARLE!</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'streak-info' }, "");
 }
 
 function updateHeader() {
@@ -131,6 +370,41 @@ function updateHeader() {
         } else {
             userBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
             userBtn.style.color = "var(--secondary-cyan)";
+        }
+    }
+    
+    // Check user actions for aligning: Search, Messages, Streak
+    const userActions = document.querySelector('.user-actions');
+    if (userActions) {
+        // 1. Asegurar icono de mensajes
+        if (!document.getElementById('header-msg-btn')) {
+            const msgBtn = document.createElement('button');
+            msgBtn.id = 'header-msg-btn';
+            msgBtn.setAttribute('onclick', "navigate('messages')");
+            msgBtn.style = "background:none; border:none; color:white; font-size:20px; cursor: pointer; position: relative; display: flex; align-items: center;";
+            msgBtn.innerHTML = `<i class="far fa-comment-dots"></i>`;
+            // Insertar antes del botón de perfil (el último en user-actions)
+            userActions.insertBefore(msgBtn, userBtn);
+        }
+
+        // 2. Asegurar indicador de racha (fuego)
+        let streakBadge = document.getElementById('header-streak-badge');
+        if (user && state.streak > 0) {
+            if (!streakBadge) {
+                streakBadge = document.createElement('div');
+                streakBadge.id = 'header-streak-badge';
+                streakBadge.className = 'streak-badge';
+                streakBadge.setAttribute('onclick', "showStreakInfo()");
+                streakBadge.style = "display: flex; align-items: center; gap: 4px; cursor: pointer;";
+                // Insertar antes de los mensajes
+                userActions.insertBefore(streakBadge, document.getElementById('header-msg-btn'));
+            }
+            streakBadge.innerHTML = `
+                <i class="fas fa-fire streak-fire-${Math.min(state.streak, 10)}" style="font-size:18px;"></i>
+                <span style="font-weight: 800; font-size: 14px; color: var(--text-white);">${state.streak}</span>
+            `;
+        } else if (streakBadge) {
+            streakBadge.remove();
         }
     }
 }
@@ -199,17 +473,27 @@ function generateNativeAdHtml(height = "75px", idPrefix = "ad") {
 }
 
 function navigate(view, extra = null, isBack = false) {
+    // 0. Prevenir recarga si viene de un enlace
+    if (window.event && window.event.preventDefault) window.event.preventDefault();
+
     // Si no es un retroceso, guardamos la vista actual en el historial
     if (!isBack && state.currentView !== view) {
         state.navigationHistory.push(state.currentView);
-        // Limitamos el historial a 15 entradas
         if (state.navigationHistory.length > 15) state.navigationHistory.shift();
+
+        // Push real state
+        window.history.pushState({ view: view, extra: extra }, view, "");
     }
 
-    // Cerramos overlays activos si existen
-    closeDetails();
+    // Cerramos overlays activos si existen (Sin disparar lógica de atrás)
+    const details = document.getElementById('details-overlay');
+    if (details) details.classList.remove('active');
     const searchOverlay = document.getElementById('search-overlay');
     if (searchOverlay) searchOverlay.classList.remove('active');
+    const popup = document.getElementById('dynamic-popup');
+    if (popup) popup.classList.remove('active');
+    const mines = document.getElementById('mines-game-overlay');
+    if (mines) { mines.classList.remove('active'); setTimeout(() => mines.remove(), 400); gameActive = false; }
 
     // Actualizamos estado visual de la barra de navegación
     const navItems = document.querySelectorAll('.bottom-nav .nav-item');
@@ -220,15 +504,9 @@ function navigate(view, extra = null, isBack = false) {
         }
     });
 
-    const header = document.querySelector('.app-header');
-    const nav = document.querySelector('.bottom-nav');
-    const mainContent = document.getElementById('main-view');
-
     // Reset de scroll al cambiar de vista
+    const mainContent = document.getElementById('main-view');
     if (mainContent) mainContent.scrollTop = 0;
-
-    // Vistas Pantalla Completa (Sin Header/Nav)
-    const isFullScreen = ['taxi', 'delivery', 'community'].includes(view);
 
     // Actualizamos estado inmediatamente
     state.currentView = view;
@@ -238,8 +516,15 @@ function navigate(view, extra = null, isBack = false) {
         state.targetProfileId = null;
     }
 
+    // --- GESTIÓN DE VISIBILIDAD DE LAYOUT ---
+    const header = document.querySelector('.app-header');
+    const nav = document.querySelector('.bottom-nav');
+    const isFullScreen = ['taxi', 'delivery', 'community', 'driver-panel', 'chat'].includes(view);
+
     if (header) header.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
-    if (nav) nav.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
+    // OCULTAR NAV TOTALMENTE EN CHAT Y VISTAS FULLSCREEN
+    const shouldHideNav = (isFullScreen || view === 'chat' || view === 'messages');
+    if (nav) nav.style.setProperty('display', shouldHideNav ? 'none' : 'flex', 'important');
 
     if (isFullScreen) {
         mainContent.style.padding = '0';
@@ -248,17 +533,27 @@ function navigate(view, extra = null, isBack = false) {
         mainContent.style.position = 'fixed';
         mainContent.style.top = '0';
         mainContent.style.left = '0';
-        mainContent.style.zIndex = '1000';
+        mainContent.style.zIndex = (view === 'chat') ? '30000' : '1000'; 
         mainContent.style.overflow = 'hidden';
+        mainContent.style.background = '#000';
     } else {
-        mainContent.style.padding = '20px 20px 100px';
+        // Aumentamos el padding para que NADA se tape con la nav bar
+        mainContent.style.padding = '20px 20px 220px'; 
         mainContent.style.height = 'auto';
         mainContent.style.width = 'auto';
-        mainContent.style.position = 'relative';
+        mainContent.style.position = 'static';
         mainContent.style.top = 'auto';
         mainContent.style.left = 'auto';
         mainContent.style.zIndex = '1';
-        mainContent.style.overflow = 'auto';
+        mainContent.style.overflowY = 'auto';
+        mainContent.style.background = 'transparent';
+    }
+    
+    // Si estamos en chat, forzamos que no haya scroll en el cuerpo para evitar que la nav aparezca
+    if (view === 'chat') {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = 'auto';
     }
 
     // Animación de salida y entrada
@@ -269,55 +564,69 @@ function navigate(view, extra = null, isBack = false) {
         renderView(view, mainContent, extra);
         mainContent.style.opacity = '1';
         mainContent.style.transform = 'translateY(0)';
+        // Aseguramos que el scroll siempre suba al navegar
+        if (mainContent.parentElement) mainContent.parentElement.scrollTop = 0;
         window.scrollTo(0, 0);
     }, 150);
 }
 
 // Handler para el botón de atrás (Físico/Barra)
-function handleBackButton() {
-    // 1. Cerrar overlays prioritarios
-    const details = document.getElementById('details-overlay');
-    if (details && details.classList.contains('active')) {
-        closeDetails();
-        return;
-    }
+function handleBackButton(isBrowserPopState = false) {
+    const now = Date.now();
+    if (window._lastBackTime && (now - window._lastBackTime < 300)) return;
+    window._lastBackTime = now;
 
-    const search = document.getElementById('search-overlay');
-    if (search && search.classList.contains('active')) {
-        toggleSearch();
-        return;
-    }
+    console.log("🔙 BackButton:", isBrowserPopState ? 'PopState' : 'Native', "View:", state.currentView);
 
-    const userSearch = document.getElementById('user-search-overlay');
-    if (userSearch && userSearch.classList.contains('active')) {
-        userSearch.classList.remove('active');
-        return;
-    }
-
-    const comments = document.querySelector('.comment-sheet');
-    if (comments && comments.classList.contains('active')) {
-        comments.classList.remove('active');
-        setTimeout(() => comments.remove(), 400);
-        return;
-    }
-
+    // 1. Cerrar Overlays (Prioridad)
+    const activeDetails = document.querySelector('.details-overlay.active');
+    const activePopup = document.querySelector('.popup-overlay.active');
+    const activeSearch = document.querySelector('#search-overlay.active, #user-search-overlay.active');
     const mines = document.getElementById('mines-game-overlay');
-    if (mines) {
-        closeMinesGame();
+    const activeComments = document.querySelector('.comment-sheet.active');
+    const activeLikes = document.querySelector('.likes-sheet.active');
+    const activeShare = document.querySelector('.share-sheet.active');
+
+    if (activeDetails || activePopup || activeSearch || mines || activeComments || activeLikes || activeShare) {
+        if (activeDetails) activeDetails.classList.remove('active');
+        if (activePopup) { activePopup.classList.remove('active'); setTimeout(() => activePopup.remove(), 400); }
+        if (activeSearch) activeSearch.classList.remove('active');
+        if (activeComments) activeComments.classList.remove('active');
+        if (activeLikes) activeLikes.classList.remove('active');
+        if (activeShare) {
+            activeShare.classList.remove('active');
+            setTimeout(() => activeShare.remove(), 400);
+        }
+        if (mines) { 
+            mines.classList.remove('active'); 
+            setTimeout(() => mines.remove(), 400); 
+            gameActive = false; 
+        }
+
+        if (!isBrowserPopState) window.history.back();
         return;
     }
 
-    // 2. Navegar hacia atrás en el stack
-    if (state.navigationHistory.length > 0) {
-        const prevView = state.navigationHistory.pop();
-        navigate(prevView, null, true);
-    } else if (state.currentView !== 'home') {
-        navigate('home');
-    } else {
-        // En Home, cerramos la app (Capacitor)
-        if (window.Capacitor && window.Capacitor.Plugins.App) {
-            window.Capacitor.Plugins.App.exitApp();
+    // 2. Salida o Retroceso
+    if (state.currentView === 'home') {
+        const exitNow = window._lastExitAttempt && (Date.now() - window._lastExitAttempt < 3000);
+        if (exitNow) {
+            if (window.Capacitor && window.Capacitor.Plugins.App) {
+                window.Capacitor.Plugins.App.exitApp();
+            }
+        } else {
+            window._lastExitAttempt = Date.now();
+            const toast = document.createElement('div');
+            toast.innerText = "Presiona de nuevo para salir";
+            toast.style = "position:fixed; bottom:140px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:20px; font-size:12px; z-index:99999;";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+            
+            if (!isBrowserPopState) window.history.pushState({ view: 'home' }, 'home', "");
         }
+    } else {
+        // Si no estamos en home, vamos atrás
+        if (!isBrowserPopState) window.history.back();
     }
 }
 
@@ -329,20 +638,28 @@ function renderView(view, container, extra = null) {
                     <h1 style="text-shadow: 0 0 10px var(--secondary-lilac);">¡Hola, Gooper!</h1>
                     <p>¿Qué necesitas hoy?</p>
                 </section>
-                <div class="quick-actions" style="margin-bottom: 10px;">
-                    <a href="#" class="action-card taxi" onclick="navigate('taxi')">
-                        <i class="fas fa-taxi"></i>
-                        <span>Pide un Taxi</span>
-                    </a>
-                    <a href="#" class="action-card delivery" onclick="navigate('delivery')">
-                        <i class="fas fa-motorcycle"></i>
-                        <span>Delivery</span>
-                    </a>
+                <!-- Opciones de Navegación Principales -->
+                <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+                    <button onclick="navigate('community')" class="action-card community" style="width: 100%; border: none; padding: 25px; border-radius: 24px; background: linear-gradient(135deg, var(--secondary-lilac) 0%, #8c309b 100%); color: white; display: flex; align-items: center; justify-content: center; gap: 15px; font-weight: 900; font-size: 20px; cursor: pointer; box-shadow: 0 5px 20px rgba(186, 150, 255, 0.4); text-transform: uppercase; margin: 0;">
+                        <i class="fas fa-users" style="font-size: 24px;"></i>
+                        Goopi Social
+                    </button>
+                    
+                    <div class="quick-actions" style="margin: 0; display: flex; gap: 15px;">
+                        <a href="#" class="action-card taxi" onclick="navigate('taxi')" style="margin: 0; flex: 1;">
+                            <i class="fas fa-taxi"></i>
+                            <span>Pide un Taxi</span>
+                        </a>
+                        <a href="#" class="action-card delivery" onclick="navigate('delivery')" style="margin: 0; flex: 1;">
+                            <i class="fas fa-motorcycle"></i>
+                            <span>Delivery</span>
+                        </a>
+                    </div>
                 </div>
                 
                 <!-- Goopi Points Button (Home View) -->
                 <div style="margin: 20px 0;">
-                    <button onclick="window.location.href='https://goopiapp.com/puntos-goopi/'" class="points-btn" style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
+                    <button onclick="showMinesGame()" class="points-btn" style="width: 100%; border: none; padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #4a3b00; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3); transition: transform 0.2s;">
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="background: rgba(255,255,255,0.3); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
                                 <i class="fas fa-coins"></i>
@@ -351,7 +668,7 @@ function renderView(view, container, extra = null) {
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.1); padding: 5px 12px; border-radius: 12px; font-size: 14px;">
                             <span>${state.userPoints}</span>
-                            <i class="fas fa-chevron-right" style="font-size: 10px; opacity: 0.6;"></i>
+                            <i class="fas fa-play" style="font-size: 10px; opacity: 0.6;"></i>
                         </div>
                     </button>
                 </div>
@@ -359,6 +676,19 @@ function renderView(view, container, extra = null) {
                 <!-- PUBLICIDAD EN HOME (Justo bajo botones) -->
                 <div style="margin-bottom: 20px;">
                     ${generateNativeAdHtml("75px", "home-mid")}
+                </div>
+
+                <!-- BOTÓN FARMACIAS DE TURNO (Utilidad Macas) -->
+                <div style="margin-bottom: 25px;">
+                    <button onclick="showFarmaciasTurno()" style="width: 100%; border: none; padding: 18px; border-radius: 22px; background: linear-gradient(135deg, #00f3ff 0%, #0077ff 100%); color: white; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; box-shadow: 0 8px 25px rgba(0, 243, 255, 0.3); transition: transform 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                                <i class="fas fa-pills"></i>
+                            </div>
+                            Farmacias de Turno Macas
+                        </div>
+                        <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.6;"></i>
+                    </button>
                 </div>
 
                 <section class="guide-preview">
@@ -384,7 +714,7 @@ function renderView(view, container, extra = null) {
                     <button onclick="navigate('register-driver')" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                         <i class="fas fa-id-card"></i> Registro de Unidades
                     </button>
-                    <button onclick="window.location.href='https://goopiapp.com/panel-taxista/'" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
+                    <button onclick="navigate('driver-panel')" class="action-card" style="width: 100%; background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--secondary-lilac); flex-direction: row; align-items: center; justify-content: center; padding: 15px; font-size: 14px; cursor: pointer;">
                         <i class="fas fa-tachometer-alt"></i> Panel de Unidades
                     </button>
                 </section>
@@ -418,8 +748,12 @@ function renderView(view, container, extra = null) {
                 `;
                 return;
             }
+            // Refuerzo: Ocultar barra de navegación si por algún motivo sigue visible
+            const bNav = document.querySelector('.bottom-nav');
+            if (bNav) bNav.style.setProperty('display', 'none', 'important');
+
             container.innerHTML = `
-                <div id="community-feed" class="tiktok-feed" style="background: #000;">
+                <div id="community-feed" class="tiktok-feed" style="background: #000; height: 100vh; width: 100vw; position: fixed; inset: 0; z-index: 100;">
                     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 40px; margin-bottom: 20px; color: var(--secondary-lilac);"></i>
                         <p style="font-weight: 700; letter-spacing: 1px;">SINCRONIZANDO...</p>
@@ -427,37 +761,86 @@ function renderView(view, container, extra = null) {
                 </div>
 
                 <!-- Botones Superiores Community -->
-                <div style="position: fixed; top: 25px; left: 0; right: 0; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; z-index: 9999;">
-                    <button onclick="navigate('home')" style="background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
+                <div style="position: fixed; top: 15px; left: 0; right: 0; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; z-index: 20000; pointer-events: none;">
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="navigate('home')" style="pointer-events: auto; background: rgba(0,0,0,0.6); border: 2.5px solid rgba(255,255,255,0.2); color: white; width: 44px; height: 44px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <button onclick="navigate('reels-map')" style="pointer-events: auto; background: rgba(0,243,255,0.2); border: 2.5px solid #00f3ff; color: #00f3ff; width: 44px; height: 44px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,243,255,0.4);">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </button>
+                    </div>
                     
-                    <button onclick="showUserSearch()" style="background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <button onclick="showUserSearch()" style="pointer-events: auto; background: rgba(0,0,0,0.6); border: 2.5px solid rgba(255,255,255,0.2); color: white; width: 44px; height: 44px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
 
-                <button onclick="showPostComposer()" class="floating-post-btn">
+                <button onclick="showPostComposer()" class="floating-post-btn" style="bottom: 30px;">
                     <i class="fas fa-plus"></i>
                 </button>
             `;
             initCommunity();
             break;
 
+        case 'reels-map':
+            container.innerHTML = `
+                <div id="reels-map-container" style="height: 100vh; width: 100vw; background: #000; position: fixed; inset: 0; z-index: 1000;">
+                    <div style="position: absolute; top: 20px; left: 20px; z-index: 2000; display: flex; gap: 10px;">
+                        <button onclick="navigate('community')" style="background: rgba(0,0,0,0.7); border: 2px solid var(--secondary-lilac); color: white; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div style="position: absolute; top: 20px; right: 20px; z-index: 2000; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(5px);">
+                        <span style="color: white; font-weight: 800; font-size: 12px;"><i class="fas fa-video" style="color: var(--secondary-lilac);"></i> REELS EN MACAS</span>
+                    </div>
+                    <div id="reels-leaflet-map" style="width: 100%; height: 100%;"></div>
+                </div>
+            `;
+            initReelsMap();
+            break;
+
         case 'taxi':
         case 'delivery':
+        case 'driver-panel':
+            const isDriver = (view === 'driver-panel');
+            
+            // Pantalla de login para conductores
+            if (isDriver && (!auth || !auth.currentUser)) {
+                container.innerHTML = `
+                    <div style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #05050a; color: white; padding: 40px; text-align: center; position: fixed; inset: 0; z-index: 1001;">
+                        <button onclick="navigate('home')" style="position: absolute; top: 30px; left: 20px; background: rgba(255,255,255,0.1); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <i class="fas fa-id-badge" style="font-size: 60px; color: var(--accent-orange); margin-bottom: 20px;"></i>
+                        <h2 style="font-weight: 900; margin-bottom: 10px;">ACCESO CONDUCTORES</h2>
+                        <div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">
+                            <button onclick="navigate('login')" style="background: var(--secondary-lilac); color: white; border: none; padding: 18px; border-radius: 18px; font-weight: 800; font-size: 15px;">USAR EMAIL</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const uid = auth && auth.currentUser ? auth.currentUser.uid : '';
+            const baseUrl = isDriver ? "https://goopiapp.com/panel-taxista/" : "https://goopiapp.com/taxis-disponibles/";
+            const finalIframeUrl = `${baseUrl}?uid=${uid}&v=5.0`;
+            
+            // RECORTE AVANZADO BLINDADO V5.0
+            const mt = isDriver ? "0" : "-460px";
+            const mb = "0px"; 
+            const height = isDriver ? "100%" : "calc(100% + 460px)";
             container.innerHTML = `
-                <div style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 500;">
-                    <!-- Botón Volver -->
-                    <button onclick="navigate('home')" style="position: absolute; top: 30px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.8); border: 1px solid var(--glass-border); color: white; width: 45px; height: 45px; border-radius: 50%; backdrop-filter: blur(10px); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                <div id="map-blindaje-container" style="height: 100vh; width: 100vw; overflow: hidden; background: #000; position: fixed; top: 0; left: 0; z-index: 999!important;">
+                    <!-- Botón Volver Naranja (Blindaje V6.0) -->
+                    <button onclick="navigate('home')" style="position: absolute; top: 30px; left: 20px; z-index: 999999!important; background: #ff8c00; border: none; color: white; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(255,140,0,0.6); pointer-events: auto!important;">
                         <i class="fas fa-arrow-left"></i>
                     </button>
-                    
-                    <!-- MAPA FONDO (Ajustado para ocultar solo el encabezado) -->
-                    <iframe src="https://goopiapp.com/taxis-disponibles/" 
-                            style="width: 100%; height: calc(100% + 550px); border: none; position: absolute; top: -450px; left: 0;" 
-                            allow="geolocation">
-                    </iframe>
+                    <div style="width: 100%; height: 100%; overflow: hidden; position: relative; z-index: 1;">
+                        <div style="width: 100%; height: 100%; margin-top: ${mt}; margin-bottom: ${mb}; position: absolute; top: 0; left: 0;">
+                            <iframe src="${finalIframeUrl}" style="width: 100%; height: ${height}; border: none; pointer-events: auto;" allow="geolocation"></iframe>
+                        </div>
+                    </div>
                 </div>
             `;
             break;
@@ -503,22 +886,13 @@ function renderView(view, container, extra = null) {
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
                         <input type="password" id="login-password" placeholder="Contraseña" style="background: none; border: none; color: white; width: 100%; outline: none; font-size: 15px;">
+                        <i class="fas fa-eye" style="color: var(--text-dim); cursor: pointer; padding: 5px;" onclick="const p = document.getElementById('login-password'); if(p.type==='password'){p.type='text'; this.className='fas fa-eye-slash';}else{p.type='password'; this.className='fas fa-eye';}"></i>
                     </div>
                     <button onclick="handleEmailLogin(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, var(--secondary-lilac) 20%, #8c309b 100%); color: white; box-shadow: 0 5px 15px rgba(186, 150, 255, 0.4); border-radius: 18px;">
                         ENTRAR AHORA
                     </button>
                     
-                    <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
-                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
-                        <span style="color: var(--text-dim); font-size: 12px;">O continúa con</span>
-                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
-                        <button onclick="handleGoogleLogin()" style="background: #fff; border: none; border-radius: 15px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #333; font-weight: 600; cursor: pointer;">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" style="width: 20px;"> Entrar con Google
-                        </button>
-                    </div>
+
 
                     <div style="text-align: center; margin-top: 25px;">
                         <p style="color: var(--text-dim); font-size: 14px;">¿No tienes cuenta? <a href="#" onclick="navigate('register')" style="color: var(--secondary-lilac); font-weight: 800; text-decoration: none;">Crea una aquí</a></p>
@@ -545,6 +919,7 @@ function renderView(view, container, extra = null) {
                     <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
                         <input type="password" id="reg-password" placeholder="Define tu contraseña" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                        <i class="fas fa-eye" style="color: var(--text-dim); cursor: pointer; padding: 5px;" onclick="const p = document.getElementById('reg-password'); if(p.type==='password'){p.type='text'; this.className='fas fa-eye-slash';}else{p.type='password'; this.className='fas fa-eye';}"></i>
                     </div>
                     <button onclick="handleEmailRegister(this)" class="action-card" style="height: auto; width: 100%; padding: 18px; border: none; justify-content: center; align-items: center; margin-top: 10px; font-weight: 700; background: linear-gradient(135deg, #00f3ff 0%, #00a8b3 100%); color: #00363d; border-radius: 18px;">
                         CREAR MI CUENTA
@@ -577,6 +952,7 @@ function renderView(view, container, extra = null) {
                         <div style="background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 18px; padding: 15px; display: flex; align-items: center; gap: 12px;">
                             <i class="fas fa-lock" style="color: var(--secondary-lilac);"></i>
                             <input type="password" id="driver-password" placeholder="Contraseña para tu cuenta" style="background: none; border: none; color: white; width: 100%; outline: none;">
+                            <i class="fas fa-eye" style="color: var(--text-dim); cursor: pointer; padding: 5px;" onclick="const p = document.getElementById('driver-password'); if(p.type==='password'){p.type='text'; this.className='fas fa-eye-slash';}else{p.type='password'; this.className='fas fa-eye';}"></i>
                         </div>
                     ` : `
                         <div style="background: rgba(0,243,255,0.1); padding: 15px; border-radius: 15px; border: 1px solid #00f3ff; margin-bottom: 10px;">
@@ -635,6 +1011,8 @@ function renderView(view, container, extra = null) {
                                 <i class="fas fa-sign-in-alt" style="margin-right: 10px;"></i> ENTRAR A MI CUENTA
                             </button>
                             
+
+
                             <button onclick="navigate('register')" class="action-card" style="width: 100%; padding: 20px; border: 2px solid var(--secondary-lilac); background: rgba(186, 150, 255, 0.1); justify-content: center; font-weight: 800; color: white; border-radius: 20px; font-size: 16px;">
                                 <i class="fas fa-user-plus" style="margin-right: 10px;"></i> CREAR CUENTA NUEVA
                             </button>
@@ -672,10 +1050,17 @@ function renderView(view, container, extra = null) {
                     <p style="color: var(--text-dim); padding-bottom: 20px;">${isMyOwnProfile ? (currentUser.email) : 'Miembro de la Comunidad Goopi'}</p>
 
                     ${!isMyOwnProfile ? `
-                        <button onclick="toggleFollow('${profileId}', this).then(() => renderView('profile', document.querySelector('.main-content')))" 
-                            style="background: ${isFollowingUser ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 12px 30px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; margin-bottom: 20px;">
-                            ${isFollowingUser ? 'SIGUIENDO' : 'SEGUIR'}
-                        </button>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                            <button onclick="toggleFollow('${profileId}', this).then(() => renderView('profile', document.querySelector('.main-content')))" 
+                                style="background: ${isFollowingUser ? 'rgba(255,255,255,0.1)' : 'var(--secondary-lilac)'}; border: 1px solid var(--secondary-lilac); color: white; padding: 12px 20px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; flex: 1; max-width: 150px;">
+                                ${isFollowingUser ? 'SIGUIENDO' : 'SEGUIR'}
+                            </button>
+                            <button onclick="viewChat('${profileId}', '${profileData.userName.replace(/\s+/g, '').toLowerCase()}', '${profileData.userPhoto || ''}')" 
+                                style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: white; padding: 12px 20px; border-radius: 15px; font-weight: 800; cursor: pointer; flex: 1; max-width: 150px;">
+                                MENSAJE
+                            </button>
+                        </div>
+                        <p style="color: var(--text-dim); font-size: 10px; margin-top: 10px;">Versión 48.5</p>
                     ` : ''
                 }
                 </div>
@@ -683,8 +1068,8 @@ function renderView(view, container, extra = null) {
                 <div style="margin-top: 20px; padding-bottom: 150px;">
                     <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 30px; border: 1px solid var(--glass-border);">
                         <div style="text-align: center;"><div style="font-weight: 900; color: var(--secondary-lilac); font-size: 20px;">${userPosts.length}</div><div style="font-size: 10px; color: var(--text-dim);">POSTS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: #00f3ff; font-size: 20px;">${isMyOwnProfile ? state.userPoints : '---'}</div><div style="font-size: 10px; color: var(--text-dim);">PUNTOS</div></div>
-                        <div style="text-align: center;"><div style="font-weight: 900; color: #ff2d55; font-size: 20px;">${isMyOwnProfile ? Object.keys(state.userFollowing || {}).length : (userPosts[0]?.likes ? Object.keys(userPosts[0].likes).length : 0)}</div><div style="font-size: 10px; color: var(--text-dim);">${isMyOwnProfile ? 'SIGUIENDO' : 'LIKES'}</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #ff2d55; font-size: 20px;">${isMyOwnProfile ? Object.keys(state.userFollowing || {}).length : (isFollowingUser ? 1 : 0)}</div><div style="font-size: 10px; color: var(--text-dim);">${isMyOwnProfile ? 'SIGUIENDO' : 'SEGUIDORES'}</div></div>
+                        <div style="text-align: center;"><div style="font-weight: 900; color: #00f3ff; font-size: 20px;">${userPosts.reduce((acc, p) => acc + (p.likes ? Object.keys(p.likes).length : 0), 0)}</div><div style="font-size: 10px; color: var(--text-dim);">LIKES</div></div>
                     </div>
 
                     <div class="section-header">
@@ -692,8 +1077,8 @@ function renderView(view, container, extra = null) {
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 30px;">
                         ${userPosts.length > 0 ? userPosts.map(p => `
-                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="navigate('community'); focusOnUserPosts('${profileId}')">
-                                ${p.mediaUrl ? (p.mediaType === 'video' ? `<video src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;"></video>` : `<img src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: cover;">`) : `<div style="padding: 5px; font-size: 8px; color: var(--text-dim); overflow: hidden;">${p.text}</div>`}
+                            <div style="aspect-ratio: 9/16; background: #222; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);" onclick="focusOnPost('${p.id}')">
+                                ${p.mediaUrl ? (p.mediaType === 'video' ? `<video src="${p.mediaUrl}#t=0.5" preload="metadata" playsinline muted onloadedmetadata="this.currentTime=0.5" style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>` : `<img src="${p.mediaUrl}" style="width: 100%; height: 100%; object-fit: contain; background: #000;">`) : `<div style="padding: 5px; font-size: 8px; color: var(--text-dim); overflow: hidden;">${p.text}</div>`}
                             </div>
                         `).join('') : '<div style="grid-column: span 3; color: var(--text-dim); font-size: 12px; text-align: center; padding: 20px;">Este usuario aún no tiene Reels.</div>'}
                     </div>
@@ -701,6 +1086,83 @@ function renderView(view, container, extra = null) {
                     ${isMyOwnProfile ? `<button onclick="handleLogout()" class="action-card" style="width: 100%; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.3); color: #ff3b30; flex-direction: row; justify-content: center; padding: 15px; margin-top: 20px; font-weight: 800;">CERRAR SESIÓN</button>` : ''}
                 </div>
             `;
+            break;
+
+        case 'messages':
+            if (!auth.currentUser) return navigate('login');
+            const chats = Object.keys(state.userChats).map(id => ({
+                id,
+                ...state.userChats[id]
+            })).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+
+            container.innerHTML = `
+                <div class="messages-inbox" style="padding-bottom: 100px;">
+                    <section class="hero">
+                        <h1>Mensajes</h1>
+                        <p>Conversaciones con la comunidad</p>
+                    </section>
+                    
+                    <div class="chats-list">
+                        ${chats.length > 0 ? chats.map(chat => `
+                            <div class="chat-list-item" onclick="viewChat('${chat.id}', '${chat.otherName}', '${chat.otherPhoto}')">
+                                <div class="chat-avatar">
+                                    ${chat.otherPhoto ? `<img src="${chat.otherPhoto}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fas fa-user"></i>`}
+                                </div>
+                                <div class="chat-info">
+                                    <h4>@${chat.otherName}</h4>
+                                    <p>${chat.lastMessage || 'Empieza a chatear...'}</p>
+                                </div>
+                                <div class="chat-meta">
+                                    <div>${chat.lastTimestamp ? new Date(chat.lastTimestamp).toLocaleDateString([], {hour: '2-digit', minute:'2-digit'}) : ''}</div>
+                                    ${chat.unread ? `<span class="unread-badge">${chat.unread}</span>` : ''}
+                                </div>
+                            </div>
+                        `).join('') : `
+                            <div style="text-align:center; padding:50px 20px; color:var(--text-dim);">
+                                <i class="far fa-comments" style="font-size:50px; margin-bottom:20px; opacity:0.3;"></i>
+                                <p>No tienes mensajes todavía.<br>Sigue a alguien y envíale un mensaje.</p>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'chat':
+            if (!auth.currentUser || !extra) return navigate('messages');
+            const { otherId, otherName, otherPhoto } = extra;
+            
+            // Limpiar no leídos
+            if (db && auth.currentUser) {
+                db.ref(`userChats/${auth.currentUser.uid}/${otherId}`).update({ unread: 0 });
+            }
+            
+            container.innerHTML = `
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <button onclick="navigate('messages')" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-arrow-left"></i></button>
+                        <div class="chat-avatar" style="width:40px; height:40px;">
+                            ${otherPhoto ? `<img src="${otherPhoto}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fas fa-user"></i>`}
+                        </div>
+                        <div style="flex:1">
+                            <h4 style="margin:0; font-size:16px;">@${otherName}</h4>
+                            <span style="font-size:10px; color:#00f3ff">EN LÍNEA</span>
+                        </div>
+                    </div>
+                    
+                    <div id="chat-messages" class="chat-messages">
+                        <div style="text-align:center; padding:20px; color:var(--text-dim); font-size:12px;">Cargando mensajes...</div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" class="chat-input" placeholder="Escribe un mensaje..." onkeypress="if(event.key==='Enter') sendMessage('${otherId}', '${otherName}', '${otherPhoto}')">
+                        <button onclick="sendMessage('${otherId}', '${otherName}', '${otherPhoto}')" class="chat-send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            syncChatMessages(otherId);
             break;
 
         default:
@@ -860,6 +1322,7 @@ function showInfoPopup(page) {
 
     setTimeout(() => {
         popupBody.classList.add('active');
+        if (!window._isHandlingBack) window.history.pushState({ overlay: 'popup' }, "");
         localStorage.setItem('last_popup_id', page.id);
         localStorage.setItem('last_popup_time', new Date().getTime());
     }, 1500);
@@ -867,15 +1330,10 @@ function showInfoPopup(page) {
 
 function closePopup() {
     const popup = document.getElementById('dynamic-popup');
-    if (popup) {
+    if (popup && popup.classList.contains('active')) {
         popup.classList.remove('active');
-        setTimeout(() => {
-            popup.remove();
-            // Si el usuario está logueado y tiene intentos, mostrar juego después de cerrar el banner
-            if (auth && auth.currentUser && state.dailyAttempts > 0) {
-                showMinesGame();
-            }
-        }, 400);
+        setTimeout(() => popup.remove(), 400);
+        if (!window._isHandlingBack) window.history.back();
     }
 }
 
@@ -883,21 +1341,27 @@ function viewDetails(postId) {
     const post = state.posts.find(p => p.id === postId);
     if (!post) return;
 
-    // Función auxiliar para buscar números en todo el objeto del Post (incluyendo ACF y Metadatos)
+    // Función auxiliar segura contra recursión para buscar números
     const findNumbersAnywhere = (obj) => {
         const found = [];
+        const seen = new Set();
         const regex = /(?:\+?593|0)(?:[\s.-]?\d){8,9}/g;
 
         const search = (item) => {
+            if (!item || seen.has(item)) return;
+            if (typeof item === 'object') seen.add(item);
+
             if (typeof item === 'string') {
                 const matches = item.match(regex);
                 if (matches) matches.forEach(m => found.push(m.replace(/[\s.-]/g, '')));
             } else if (typeof item === 'object' && item !== null) {
-                Object.values(item).forEach(search);
+                try {
+                    Object.values(item).forEach(search);
+                } catch (e) { /* Evitar errores en objetos proxy o restringidos */ }
             }
         };
         search(obj);
-        return [...new Set(found)]; // Eliminar duplicados
+        return [...new Set(found)];
     };
 
     const allFoundNumbers = findNumbersAnywhere(post);
@@ -973,16 +1437,23 @@ function viewDetails(postId) {
             ${post.content.rendered}
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 30px; padding-bottom: 50px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 30px; padding-bottom: 250px;">
             ${buttonsHtml}
         </div>
     `;
 
     overlay.classList.add('active');
+    // Notificar al historial del navegador
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'details' }, "");
 }
 
 function closeDetails() {
-    document.getElementById('details-overlay').classList.remove('active');
+    const overlay = document.getElementById('details-overlay');
+    if (overlay && overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        // Solo retrocedemos en el historial si el overlay se cerró manualmente
+        if (!window._isHandlingPopState) window.history.back();
+    }
 }
 
 // La inicialización se maneja mediante BOOTSTRAP al final del archivo
@@ -990,6 +1461,12 @@ function closeDetails() {
 
 // --- COMMUNITY & SOCIAL LOGIC ---
 function initCommunity() {
+    if (window._isCommunityListenerSet) {
+        if (state.currentView === 'community') renderCommunityPosts();
+        return;
+    }
+    window._isCommunityListenerSet = true;
+    
     if (!db) {
         console.log("Waiting for Firebase DB...");
         setTimeout(initCommunity, 1000);
@@ -1000,18 +1477,37 @@ function initCommunity() {
     const postsRef = db.ref('posts');
     postsRef.on('value', (snapshot) => {
         const rawPosts = snapshot.val();
-        if (!rawPosts) {
-            console.log("No posts found in DB yet.");
-            state.communityPosts = [];
-        } else {
-            state.communityPosts = Object.keys(rawPosts).map(id => ({
-                id,
-                ...rawPosts[id]
-            })).reverse();
-        }
+        const oldPostsLength = state.communityPosts.length;
+        
+        state.communityPosts = Object.keys(rawPosts || {}).map(id => ({
+            id,
+            ...rawPosts[id]
+        })).reverse();
 
         if (state.currentView === 'community') {
-            renderCommunityPosts();
+            const feed = document.getElementById('community-feed');
+            if (feed && feed.children.length > 0 && oldPostsLength > 0 && oldPostsLength === state.communityPosts.length) {
+                // Actualización quirúrgica de likes/comentarios para no resetear scroll ni videos
+                state.communityPosts.forEach(post => {
+                    const postEl = document.getElementById(`post-${post.id}`);
+                    if (postEl) {
+                        const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+                        const commCount = post.comments ? Object.keys(post.comments).length : 0;
+                        const user = auth ? auth.currentUser : null;
+                        const liked = post.likes && user && post.likes[user.uid];
+
+                        const heartIcon = postEl.querySelector('.fa-heart');
+                        if (heartIcon) heartIcon.className = `fas fa-heart ${liked ? 'liked' : ''}`;
+
+                        const likesSpan = postEl.querySelector('.action-item i.fa-heart + span');
+                        const commSpan = postEl.querySelector('.action-item i.fa-comment-dots + span');
+                        if (likesSpan) likesSpan.innerText = likesCount;
+                        if (commSpan) commSpan.innerText = commCount;
+                    }
+                });
+            } else {
+                renderCommunityPosts();
+            }
         } else if (state.currentView === 'profile') {
             const mainContent = document.querySelector('.main-content');
             renderView('profile', mainContent);
@@ -1052,22 +1548,23 @@ function renderCommunityPosts() {
         feed.innerHTML = `
             <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: white; text-align: center; padding: 20px;">
                 <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 20px; opacity: 0.5;"></i>
-                <h2>Aún no hay Reels</h2>
+                <h2>Aún no hay publicaciones</h2>
                 <p style="color: #888;">¡Sé el primero en compartir un momento regional!</p>
             </div>
         `;
         return;
     }
-    feed.innerHTML = state.communityPosts.map(post => {
+    let outputHTML = '';
+    state.communityPosts.forEach((post, index) => {
         const user = auth ? auth.currentUser : null;
         const liked = post.likes && user && post.likes[user.uid];
         const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
-        return `
+        outputHTML += `
             <div id="post-${post.id}" class="tiktok-post" data-user-id="${post.userId}">
                     ${post.mediaUrl ? (
                 post.mediaType === 'video'
-                    ? `<video src="${post.mediaUrl}" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
+                    ? `<video src="${post.mediaUrl}#t=0.5" preload="metadata" onloadedmetadata="this.currentTime=0.5" class="tiktok-media" loop playsinline ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>`
                     : `<img src="${post.mediaUrl}" class="tiktok-media">`
             ) : `<div class="tiktok-media" style="background: linear-gradient(45deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 40px; text-align: center;">${post.text}</div>`
             }
@@ -1081,9 +1578,9 @@ function renderCommunityPosts() {
                     <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
                         <i class="fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
                     </div>
-                    <div class="action-item" onclick="event.stopPropagation(); handleLike('${post.id}')">
-                        <i class="fas fa-heart ${liked ? 'liked' : ''}"></i>
-                        <span>${likesCount}</span>
+                    <div class="action-item">
+                        <i class="fas fa-heart ${liked ? 'liked' : ''}" onclick="event.stopPropagation(); handleLike('${post.id}')"></i>
+                        <span onclick="event.stopPropagation(); showLikes('${post.id}')" style="min-width: 20px; text-align: center;">${likesCount}</span>
                     </div>
                     <div class="action-item" onclick="event.stopPropagation(); showComments('${post.id}')">
                         <i class="fas fa-comment-dots"></i>
@@ -1111,8 +1608,49 @@ function renderCommunityPosts() {
                     </div>
                 </div>
             </div >
-                `;
-    }).join('');
+        `;
+        
+        // --- INYECTOR DE ANUNCIOS: Cada 4 posts orgánicos ---
+        if ((index + 1) % 4 === 0 && state.socialAds && state.socialAds.length > 0) {
+            const adIndex = Math.floor(index / 4) % state.socialAds.length;
+            const ad = state.socialAds[adIndex];
+            
+            outputHTML += `
+            <div class="tiktok-post ad-post" style="background: #000; position: relative;">
+                ${ad.type === 'video' 
+                    ? `<video src="${ad.url}" class="tiktok-media" loop playsinline autoplay ${state.isMuted ? 'muted' : ''} onclick="toggleVideo(this)"></video>` 
+                    : (ad.type === 'iframe' 
+                       ? `<iframe src="${ad.url}" frameborder="0" allowfullscreen allow="autoplay; fullscreen; picture-in-picture" style="pointer-events:none; width: 100vw; height: 100vh; border: none; overflow: hidden; transform: scale(1.02);"></iframe>` 
+                       : `<img src="${ad.url}" class="tiktok-media" style="object-fit: contain;">`
+                      )
+                }
+                
+                <div style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8); color: #00f3ff; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 900; border: 1px solid #00f3ff; z-index: 100; box-shadow: 0 0 15px rgba(0,243,255,0.4);">⭐ PATROCINADO</div>
+                
+                <!-- Action Buttons Falsos para dar el feel -->
+                <div class="tiktok-actions">
+                    <div class="action-item" onclick="event.stopPropagation(); toggleMute()">
+                        <i class="fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
+                    </div>
+                    <div class="action-item">
+                        <i class="fas fa-heart"></i>
+                        <span style="min-width: 20px; text-align: center;">9K</span>
+                    </div>
+                </div>
+
+                <div class="tiktok-overlay" style="pointer-events: none;">
+                    <div class="tiktok-info">
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
+                             <div class="user-tag" style="margin-bottom: 0; font-size: 18px; color: #00f3ff; text-shadow: 0 2px 10px rgba(0,0,0,1);">🎁 Recomendación Goopi</div>
+                        </div>
+                        <div class="post-desc" style="color: white; font-weight: 600;">Desliza hacia arriba para seguir viendo más contenido de tu ciudad.</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+    });
+
+    feed.innerHTML = outputHTML;
 
     // Auto-play first video
     const videos = feed.querySelectorAll('video');
@@ -1142,7 +1680,7 @@ function toggleMute() {
     // Update icons in all action items
     const muteIcons = document.querySelectorAll('.tiktok-actions .fa-volume-up, .tiktok-actions .fa-volume-mute');
     muteIcons.forEach(icon => {
-        icon.className = `fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'} `;
+    icon.className = `fas ${state.isMuted ? 'fa-volume-mute' : 'fa-volume-up'} `;
     });
 }
 
@@ -1150,17 +1688,100 @@ async function sharePost(postId) {
     const post = state.communityPosts.find(p => p.id === postId);
     if (!post) return;
 
+    const shareUrl = window.location.origin + window.location.pathname + '?post=' + postId;
+    const shareTitle = `¡Mira el reel de @${post.userName.toString().replace(/\s+/g, '').toLowerCase()} en Goopi!`;
+    const shareText = post.text || 'Mira este momento increíble en Goopi App.';
+
+    // Crear el Menú de Compartir Personalizado (Hermoso & Funcional)
+    const existing = document.querySelector('.share-sheet');
+    if (existing) existing.remove();
+
+    const sheet = document.createElement('div');
+    sheet.className = 'share-sheet';
+    sheet.innerHTML = `
+        <div class="share-sheet-backdrop" onclick="closeShareSheet()"></div>
+        <div class="share-sheet-content">
+            <div class="share-sheet-handle"></div>
+            <h3>Compartir Reel</h3>
+            <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 25px;">Elige cómo quieres compartir este momento</p>
+            
+            <div class="share-options-grid">
+                <div class="share-option" onclick="shareToWhatsApp('${shareUrl}', '${shareText}')">
+                    <div class="share-icon wa"><i class="fab fa-whatsapp"></i></div>
+                    <span>WhatsApp</span>
+                </div>
+                <div class="share-option" onclick="shareToFacebook('${shareUrl}')">
+                    <div class="share-icon fb"><i class="fab fa-facebook-f"></i></div>
+                    <span>Facebook</span>
+                </div>
+                <div class="share-option" onclick="copyShareLink('${shareUrl}')">
+                    <div class="share-icon copy"><i class="fas fa-link"></i></div>
+                    <span>Copiar Link</span>
+                </div>
+                <div class="share-option" onclick="shareMore('${shareUrl}', '${shareTitle}', '${shareText}')">
+                    <div class="share-icon more"><i class="fas fa-ellipsis-h"></i></div>
+                    <span>Más</span>
+                </div>
+            </div>
+            
+            <button class="share-cancel-btn" onclick="closeShareSheet()">CANCELAR</button>
+        </div>
+    `;
+
+    document.body.appendChild(sheet);
+    setTimeout(() => sheet.classList.add('active'), 10);
+    
+    // Registrar en el historial para botón físico de atrás
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'share' }, "");
+}
+
+function closeShareSheet() {
+    const sheet = document.querySelector('.share-sheet');
+    if (sheet) {
+        sheet.classList.remove('active');
+        setTimeout(() => sheet.remove(), 400);
+        if (!window._isHandlingPopState) window.history.back();
+    }
+}
+
+function shareToWhatsApp(url, text) {
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text + " " + url)}`;
+    window.open(waUrl, '_system');
+    closeShareSheet();
+}
+
+function shareToFacebook(url) {
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    window.open(fbUrl, '_system');
+    closeShareSheet();
+}
+
+function copyShareLink(url) {
+    copyToClipboard(url);
+    closeShareSheet();
+}
+
+async function shareMore(url, title, text) {
     if (navigator.share) {
         try {
-            await navigator.share({
-                title: 'Goopi App - Reel de ' + post.userName,
-                text: post.text,
-                url: window.location.href
-            });
-        } catch (e) { console.log('Error sharing:', e); }
+            await navigator.share({ title, text, url });
+        } catch (e) {
+            console.log("Web Share failed", e);
+        }
     } else {
-        alert("Enlace copiado: " + window.location.href);
+        copyShareLink(url);
     }
+    closeShareSheet();
+}
+
+function copyToClipboard(text) {
+    const el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    alert("¡Enlace del Reel copiado al portapapeles!");
 }
 
 function showComments(postId) {
@@ -1178,7 +1799,7 @@ function showComments(postId) {
     sheet.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <h3 style="color:white; margin:0;">Comentarios (${comments.length})</h3>
-            <button onclick="this.closest('.comment-sheet').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-times"></i></button>
+            <button onclick="window.history.back()" style="background:none; border:none; color:white; font-size:20px;"><i class="fas fa-times"></i></button>
         </div>
         <div class="comment-list">
             ${comments.length > 0 ? comments.map(c => `
@@ -1191,7 +1812,8 @@ function showComments(postId) {
                             <b style="margin: 0;">${c.userName || 'Gooper'}</b>
                             <span style="font-size: 8px; color: var(--text-dim);">${new Date(c.timestamp).toLocaleDateString()}</span>
                         </div>
-                        <div>${c.text}</div>
+                        <div style="font-size: 14px; line-height: 1.4;">${c.text}</div>
+                        <button onclick="replyToComment('${c.userName}')" style="background: none; border: none; color: var(--secondary-lilac); font-size: 10px; font-weight: 800; padding: 5px 0; cursor: pointer; text-transform: uppercase;">Responder</button>
                     </div>
                 </div>
             `).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.3); padding:40px;">No hay comentarios aún. ¡Sé el primero!</div>'}
@@ -1204,6 +1826,16 @@ function showComments(postId) {
 
     document.body.appendChild(sheet);
     setTimeout(() => sheet.classList.add('active'), 10);
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'comments' }, "");
+}
+
+function replyToComment(userName) {
+    const input = document.getElementById('new-comment-text');
+    if (input) {
+        const tag = `@${userName.toString().replace(/\s+/g, '').toLowerCase()} `;
+        input.value = tag;
+        input.focus();
+    }
 }
 
 async function sendComment(postId) {
@@ -1239,13 +1871,64 @@ async function handleLike(postId) {
     if (!auth.currentUser) return navigate('login');
     const post = state.communityPosts.find(p => p.id === postId);
     const userId = auth.currentUser.uid;
+    const userName = auth.currentUser.displayName || 'Gooper';
+    const userPhoto = auth.currentUser.photoURL || '';
     const likeRef = db.ref(`posts/${postId}/likes/${userId}`);
 
     if (post.likes && post.likes[userId]) {
         await likeRef.remove();
     } else {
-        await likeRef.set(true);
+        await likeRef.set({
+            userId: userId,
+            name: userName,
+            photo: userPhoto,
+            timestamp: Date.now()
+        });
     }
+}
+
+function showLikes(postId) {
+    const post = state.communityPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    let existingSheet = document.querySelector('.likes-sheet');
+    if (existingSheet) existingSheet.remove();
+
+    const sheet = document.createElement('div');
+    sheet.className = 'likes-sheet comment-sheet'; // Reutilizamos estilos de comment-sheet
+
+    const likes = post.likes ? Object.values(post.likes) : [];
+
+    sheet.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="color:white; margin:0;">Me gusta (${likes.length})</h3>
+            <button onclick="window.history.back()" style="background:none; border:none; color:white; font-size:24px;"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="comment-list" style="margin-top: 0;">
+            ${likes.length > 0 ? likes.map(l => {
+                const name = (l && typeof l === 'object' ? (l.name || 'Gooper') : 'Gooper');
+                const photo = (l && typeof l === 'object' ? (l.photo || '') : '');
+                const userId = (l && typeof l === 'object' ? (l.userId || '') : '');
+                
+                return `
+                <div class="comment-item" style="align-items: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div class="comment-avatar" style="width: 45px; height: 45px; overflow: hidden; border: 2px solid var(--secondary-lilac);">
+                        ${photo ? `<img src="${photo}" style="width: 100%; height: 100%; object-fit: cover;">` : (name?.[0] || 'G')}
+                    </div>
+                    <div class="comment-content" style="background: none; padding: 0;">
+                        <b style="font-size: 15px; margin: 0; color: white;">@${name.toString().replace(/\s+/g, '').toLowerCase()}</b>
+                        <p style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">Visto por Goopi</p>
+                    </div>
+                    ${userId ? `<button onclick="viewUserProfile('${userId}')" style="background: var(--secondary-lilac); border: none; color: white; padding: 8px 16px; border-radius: 12px; font-size: 10px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 10px rgba(186,150,255,0.3);">VER</button>` : ''}
+                </div>
+                `;
+            }).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.3); padding:40px;">Nadie ha dado me gusta todavía.</div>'}
+        </div>
+    `;
+
+    document.body.appendChild(sheet);
+    setTimeout(() => sheet.classList.add('active'), 10);
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'likes' }, "");
 }
 
 function showPostComposer() {
@@ -1283,9 +1966,9 @@ function previewMedia(input) {
 
     const url = URL.createObjectURL(file);
     if (file.type.startsWith('image/')) {
-        preview.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        preview.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;">`;
     } else {
-        preview.innerHTML = `<video src="${url}" style="width: 100%; height: 100%; object-fit: cover;" autoplay muted loop></video>`;
+        preview.innerHTML = `<video src="${url}#t=0.5" preload="auto" onloadeddata="this.currentTime=0.5" style="width: 100%; height: 100%; object-fit: contain;" autoplay muted loop></video>`;
     }
 }
 
@@ -1328,6 +2011,20 @@ async function submitPost(btn) {
             console.log("Archivo subido con éxito:", mediaUrl);
         }
 
+        // Obtener ubicación actual para el Reel
+        let lat = 0, lng = 0;
+        try {
+            if (window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+                const pos = await window.Capacitor.Plugins.Geolocation.getCurrentPosition();
+                lat = pos.coords.latitude;
+                lng = pos.coords.longitude;
+            } else if (navigator.geolocation) {
+                const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000}));
+                lat = pos.coords.latitude;
+                lng = pos.coords.longitude;
+            }
+        } catch(e) { console.warn("No location for reel:", e); }
+
         const newPostRef = db.ref('posts').push();
         await newPostRef.set({
             userId: user.uid,
@@ -1336,6 +2033,8 @@ async function submitPost(btn) {
             text: text,
             mediaUrl: mediaUrl,
             mediaType: mediaType,
+            lat: lat,
+            lng: lng,
             timestamp: Date.now()
         });
 
@@ -1438,20 +2137,7 @@ async function handleDriverRegistration(btn) {
             return alert("Por favor ingresa un correo para verificar tu registro.");
         }
 
-        // --- VALIDACIÓN DE WHITELIST (GOOGLE FORMS) ---
-        // Verificamos si el correo está en la colección 'autorizados' (alimentada por Google Forms)
-        const authDoc = await fs.collection('autorizados').doc(emailToCheck).get();
-        if (!authDoc.exists) {
-            // También probamos con búsqueda por campo por si acaso
-            const authSnapshot = await fs.collection('autorizados').where('email', '==', emailToCheck).get();
-            if (authSnapshot.empty) {
-                alert("❌ ACCESO RESTRINGIDO: Tu correo no figura en la lista de conductores pre-inscritos vía Google Forms. Por favor, inscríbete primero.");
-                btn.disabled = false;
-                btn.innerText = "FINALIZAR REGISTRO";
-                return;
-            }
-        }
-        // ----------------------------------------------
+
 
         if (!user) {
             const email = emailInput.value;
@@ -1503,17 +2189,24 @@ async function handleDriverRegistration(btn) {
     }
 }
 
-function handleGoogleLogin() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider);
-}
+
 
 // --- SEARCH LOGIC ---
 function toggleSearch() {
     const searchOverlay = document.getElementById('search-overlay');
-    searchOverlay.classList.toggle('active');
+    if (!searchOverlay) return;
+
     if (searchOverlay.classList.contains('active')) {
-        document.getElementById('main-search-input').focus();
+        searchOverlay.classList.remove('active');
+        if (!window._isHandlingBack) window.history.back();
+    } else {
+        searchOverlay.classList.add('active');
+        const input = document.getElementById('main-search-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+        if (!window._isHandlingBack) window.history.pushState({ overlay: 'search' }, "");
     }
 }
 
@@ -1556,18 +2249,22 @@ function viewUserProfile(uid) {
     navigate('profile', uid);
 }
 
-function focusOnUserPosts(uid) {
+function focusOnPost(postId) {
     if (state.currentView !== 'community') navigate('community');
 
-    setTimeout(() => {
-        const feed = document.getElementById('community-feed');
-        if (!feed) return;
-
-        const target = feed.querySelector(`.tiktok-post[data-user-id="${uid}"]`);
+    let attempts = 0;
+    const scrollInterval = setInterval(() => {
+        const target = document.getElementById(`post-${postId}`);
         if (target) {
             target.scrollIntoView({ behavior: 'smooth' });
+            // Forzar play si es video
+            const video = target.querySelector('video');
+            if (video) video.play().catch(() => {});
+            clearInterval(scrollInterval);
         }
-    }, 800);
+        attempts++;
+        if (attempts > 20) clearInterval(scrollInterval); // Max 4 seconds
+    }, 200);
 }
 
 function showUserSearch() {
@@ -1575,22 +2272,27 @@ function showUserSearch() {
     if (!searchOverlay) {
         searchOverlay = document.createElement('div');
         searchOverlay.id = 'user-search-overlay';
-        searchOverlay.className = 'search-overlay'; // Reusing styles
+        searchOverlay.className = 'search-overlay'; 
+        searchOverlay.style.zIndex = "20000"; // Ensure it's above community feed
         searchOverlay.innerHTML = `
             <div class="search-header">
-                <button class="back-btn" onclick="document.getElementById('user-search-overlay').classList.remove('active')" style="margin-bottom: 0;">
+                <button class="back-btn" onclick="window.history.back()" style="margin-bottom: 0;">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-                <input type="text" id="user-search-input" placeholder="Buscar usuarios (@gooper...)" onkeyup="handleUserSearch(event)">
+                <input type="text" id="user-search-input" placeholder="Buscar Goopers..." onkeyup="handleUserSearch(event)">
             </div>
-            <div id="user-search-results" class="search-results">
-                <!-- User results -->
-            </div>
+            <div id="user-search-results" class="search-results"></div>
         `;
         document.body.appendChild(searchOverlay);
     }
     searchOverlay.classList.add('active');
-    document.getElementById('user-search-input').focus();
+    const input = document.getElementById('user-search-input');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    document.getElementById('user-search-results').innerHTML = '';
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'user-search' }, "");
 }
 
 function handleUserSearch(event) {
@@ -1629,7 +2331,7 @@ function handleUserSearch(event) {
         const isFollowing = state.userFollowing && state.userFollowing[u.uid];
         return `
             <div class="search-item" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 15px; flex: 1;" onclick="document.getElementById('user-search-overlay').classList.remove('active'); focusOnUserPosts('${u.uid}')">
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1;" onclick="document.getElementById('user-search-overlay').classList.remove('active'); viewUserProfile('${u.uid}')">
                     <div style="width:40px; height:40px; border-radius:50%; background:var(--secondary-lilac); display:flex; align-items:center; justify-content:center; color:white; overflow: hidden;">
                         ${u.photo ? `<img src="${u.photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user"></i>`}
                     </div>
@@ -1723,64 +2425,149 @@ async function updateProfilePhoto(input) {
         updateHeader();
         renderView('profile', document.querySelector('.main-content'));
     } catch (e) {
-        console.error("Error Firebase Storage:", e);
-        if (e.code === 'storage/unauthorized') {
-            alert("❌ ERROR DE PERMISOS:\n\nDebes ir a Firebase Console > Storage > Rules y cambiar la regla a:\n\nallow read, write: if request.auth != null;");
-        } else {
-            alert("Error: " + e.message);
+            if (e.code === 'storage/unauthorized') {
+                alert("❌ ERROR DE PERMISOS:\n\nDebes ir a Firebase Console > Storage > Rules y cambiar la regla a:\n\nallow read, write: if request.auth != null;");
+            } else {
+                alert("Error: " + e.message);
+            }
+            avatarDiv.innerHTML = originalHtml;
+            avatarDiv.style.pointerEvents = "auto";
         }
-        avatarDiv.innerHTML = originalHtml;
-        avatarDiv.style.pointerEvents = "auto";
     }
-}
 
-// --- MINES GAME LOGIC (Restored v38.0) ---
+// --- MINES GAME LOGIC (CHALLENGE EDITION v4.0) ---
 let gameActive = false;
 let currentMines = [];
-let revealedCount = 0;
-let potentialWin = 0;
+let blueDiamondsInGame = 0;
 
 function showMinesGame() {
     if (gameActive) return;
 
-    const overlay = document.createElement('div');
-    overlay.className = 'mines-overlay';
-    overlay.id = 'mines-game-overlay';
-
-    // Generar 3 minas aleatorias en un tablero de 25
-    currentMines = [];
-    while (currentMines.length < 3) {
-        let r = Math.floor(Math.random() * 25);
-        if (!currentMines.includes(r)) currentMines.push(r);
+    if (state.redDiamonds >= 10) {
+        victoryRedDiamonds();
+        return;
     }
-
-    revealedCount = 0;
-    potentialWin = 0;
-    gameActive = true;
+    
+    // El juego solo abre el menú de inicio
+    const overlay = document.createElement('div');
+    overlay.id = 'mines-game-overlay';
+    overlay.className = 'mines-overlay active';
 
     overlay.innerHTML = `
+        <style>
+            .mines-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(15px); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.4s; }
+            .mines-overlay.active { opacity: 1; }
+            .mines-container { background: rgba(15, 5, 25, 0.8); width: 92%; max-width: 420px; padding: 25px; border-radius: 35px; border: 1px solid rgba(255,255,255,0.1); text-align: center; position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.6); }
+            .mines-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+            .stat-box { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+            .mines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
+            .mine-cell { aspect-ratio: 1; background: rgba(255,255,255,0.07); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; cursor: pointer; transition: 0.2s all; border: 1px solid rgba(255,255,255,0.03); }
+            .mine-cell.revealed { background: rgba(0,0,0,0.4); border-color: transparent; }
+            .mine-cell.revealed-diamond { color: #00f2ff; text-shadow: 0 0 15px #00f2ff; }
+            .mine-cell.revealed-mine { color: #ff3366; text-shadow: 0 0 15px #ff3366; animation: shake 0.4s; }
+            .mines-btn { width: 100%; padding: 18px; border-radius: 20px; border: none; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.3s; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
+            .btn-start { background: linear-gradient(135deg, #FF8C00, #FF0080); color: white; box-shadow: 0 10px 20px rgba(255, 0, 128, 0.2); }
+            .btn-start:disabled { background: #333; opacity: 0.5; cursor: not-allowed; }
+            .red-diamond-counter { display: flex; justify-content: center; gap: 5px; margin: 15px 0; }
+            .red-dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+            .red-dot.active { background: #ff3333; box-shadow: 0 0 10px #ff3333; border-color: #ff3333; }
+            @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+            @keyframes pulse-orange {
+                0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.7); }
+                70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255, 140, 0, 0); }
+                100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 140, 0, 0); }
+            }
+        </style>
         <div class="mines-container">
-            <h2 style="color:white; margin-bottom:10px;">Minas Goopi</h2>
-            <p style="color:var(--secondary-lilac); font-size:12px; margin-bottom:20px;">¡Encuentra diamantes y gana puntos! Tienes ${state.dailyAttempts} intentos hoy.</p>
+            <button onclick="closeMinesGame()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.1); border: none; color: white; width: 35px; height: 35px; border-radius: 50%; cursor: pointer;"><i class="fas fa-times"></i></button>
+            <h2 style="color:white; margin-bottom:5px; font-weight:900;">GOOPI CHALLENGE</h2>
+            <p style="color:rgba(255,255,255,0.4); font-size:11px; margin-bottom:20px;">10 Diamantes Rojos = Gran Premio</p>
             
-            <div class="mines-stats">
-                <div style="text-align:left;"><span style="color:var(--text-dim); font-size:10px;">GANANCIA</span><br><b id="potential-win" style="color:#ffd700;">+0</b></div>
-                <div style="text-align:right;"><span style="color:var(--text-dim); font-size:10px;">INTENTOS</span><br><b style="color:white;">${state.dailyAttempts}</b></div>
+            <div id="setup-view">
+                <div class="stat-box" style="margin-bottom:15px;">
+                    <span style="color:rgba(255,255,255,0.4); font-size:10px; font-weight:800; display:block;">PUNTOS DISPONIBLES</span>
+                    <b style="color:white; font-size:24px;">${state.userPoints}</b>
+                </div>
+                
+                <div class="red-diamond-counter">
+                    ${Array(10).fill(0).map((_, i) => `<div class="red-dot ${i < state.redDiamonds ? 'active' : ''}"></div>`).join('')}
+                </div>
+                <p style="color:#ff3333; font-weight:800; font-size:13px; margin-bottom:20px;">${state.redDiamonds} / 10 DIAMANTES ROJOS</p>
+
+                ${state.userPoints < 100 ? `
+                    <div style="background: rgba(255,140,0,0.1); padding: 15px; border-radius: 20px; border: 1px solid var(--accent-orange); margin-bottom: 15px;">
+                        <span style="font-size: 30px; display: block; margin-bottom: 5px;">🪫</span>
+                        <p style="color:white; font-size: 12px; font-weight: 700;">¡TE QUEDASTE SIN PUNTOS!</p>
+                        <p style="color:rgba(255,255,255,0.5); font-size: 10px;">Ve a un punto de recarga para obtener 1000 más.</p>
+                    </div>
+                    <button onclick="showRechargeMap()" class="mines-btn" style="background: var(--accent-orange); color: white; animation: pulse-orange 1.5s infinite;">
+                        🔍 VER PUNTOS DE RECARGA
+                    </button>
+                ` : `
+                    <button onclick="startMinesGame()" class="mines-btn btn-start">
+                        NUEVO INTENTO (100 Pts)
+                    </button>
+                `}
+                <p style="color:rgba(255,255,255,0.3); font-size:10px; margin-top:10px;">Encuentra 10 diamantes azules para ganar 1 rojo</p>
             </div>
 
-            <div class="mines-grid" id="mines-grid">
-                ${Array(25).fill(0).map((_, i) => `<div class="mine-cell" onclick="handleMineClick(${i}, this)"><i class="fas fa-gem" style="opacity:0;"></i></div>`).join('')}
-            </div>
+            <div id="game-view" style="display:none;">
+                <div class="mines-stats">
+                    <div class="stat-box">
+                        <span style="color:rgba(255,255,255,0.4); font-size:9px; font-weight:800; display:block;">PUNTOS</span>
+                        <b id="points-in-game" style="color:white; font-size:18px;">${state.userPoints}</b>
+                    </div>
+                    <div class="stat-box">
+                        <span style="color:rgba(255,255,255,0.4); font-size:9px; font-weight:800; display:block;">AZULES</span>
+                        <b id="blue-count" style="color:#00f2ff; font-size:18px;">0 / 10</b>
+                    </div>
+                </div>
 
-            <div style="display:flex; gap:10px;">
-                <button id="cashout-btn" onclick="cashoutGame()" class="mines-btn mines-btn-cashout" style="display:none;">RETIRAR PUNTOS</button>
-                <button onclick="closeMinesGame()" class="mines-btn" style="background:rgba(255,255,255,0.1); color:white;">SALIR</button>
+                <div class="mines-grid" id="mines-grid">
+                    <!-- Dinámico -->
+                </div>
+                
+                <div style="background: rgba(255,51,102,0.1); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,51,102,0.2);">
+                    <small style="color:#ff3366; font-weight:800; font-size:10px;">¡CUIDADO! 5 MINAS ACTIVAS</small>
+                </div>
             </div>
         </div>
     `;
 
     document.body.appendChild(overlay);
+    setTimeout(() => overlay.classList.add('active'), 50);
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'mines' }, "");
 }
+
+window.startMinesGame = () => {
+    if (state.userPoints < 100) return alert("Puntos insuficientes. Vuelve mañana o visita un punto de recarga.");
+
+    state.userPoints -= 100;
+    if (auth && auth.currentUser) {
+        db.ref('gameStats/' + auth.currentUser.uid).update({
+            points: state.userPoints,
+            lastDate: new Date().toLocaleDateString()
+        });
+    }
+
+    document.getElementById('setup-view').style.display = 'none';
+    document.getElementById('game-view').style.display = 'block';
+    
+    // Generar tablero
+    blueDiamondsInGame = 0;
+    gameActive = true;
+    currentMines = [];
+    while (currentMines.length < 5) {
+        let r = Math.floor(Math.random() * 25);
+        if (!currentMines.includes(r)) currentMines.push(r);
+    }
+
+    const grid = document.getElementById('mines-grid');
+    grid.innerHTML = Array(25).fill(0).map((_, i) => `<div class="mine-cell" onclick="handleMineClick(${i}, this)"><i class="fas fa-gem" style="opacity:0.05;"></i></div>`).join('');
+    
+    document.getElementById('blue-count').innerText = "0 / 10";
+    document.getElementById('points-in-game').innerText = state.userPoints;
+};
 
 window.handleMineClick = async (index, cell) => {
     if (!gameActive || cell.classList.contains('revealed')) return;
@@ -1788,12 +2575,12 @@ window.handleMineClick = async (index, cell) => {
     cell.classList.add('revealed');
 
     if (currentMines.includes(index)) {
-        // BOOM
         gameActive = false;
         cell.classList.add('revealed-mine');
         cell.innerHTML = '<i class="fas fa-bomb"></i>';
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 200]);
 
-        // Revelar todas las minas
         setTimeout(() => {
             currentMines.forEach(m => {
                 const c = document.getElementById('mines-grid').children[m];
@@ -1801,56 +2588,304 @@ window.handleMineClick = async (index, cell) => {
                 c.innerHTML = '<i class="fas fa-bomb"></i>';
             });
 
-            // Restar intento
-            state.dailyAttempts--;
+            alert("💥 MINA DETONADA. Perdiste este intento (100 pts).");
+            
+            // Regresar al setup
+            document.getElementById('setup-view').style.display = 'block';
+            document.getElementById('game-view').style.display = 'none';
+            
+            // Actualizar puntos en UI de setup
+            const setupPts = document.querySelector('#setup-view .stat-box b');
+            if (setupPts) setupPts.innerText = state.userPoints;
+            
+            const startBtn = document.querySelector('.btn-start');
+            if (startBtn) startBtn.disabled = (state.userPoints < 100);
+
+        }, 600);
+
+    } else {
+        cell.classList.add('revealed-diamond');
+        cell.innerHTML = '<i class="fas fa-gem"></i>';
+        blueDiamondsInGame++;
+        
+        document.getElementById('blue-count').innerText = `${blueDiamondsInGame} / 10`;
+        if (navigator.vibrate) navigator.vibrate(50);
+
+        if (blueDiamondsInGame >= 10) {
+            gameActive = false;
+            state.redDiamonds++;
+            
             if (auth && auth.currentUser) {
-                db.ref('gameStats/' + auth.currentUser.uid).update({
-                    attempts: state.dailyAttempts,
-                    lastDate: new Date().toLocaleDateString()
+                await db.ref('gameStats/' + auth.currentUser.uid).update({
+                    redDiamonds: state.redDiamonds
                 });
             }
 
-            alert("¡BOOM! Has perdido. Te quedan " + state.dailyAttempts + " intentos.");
-            setTimeout(closeMinesGame, 2000);
-        }, 500);
-
-    } else {
-        // DIAMANTE
-        cell.classList.add('revealed-diamond');
-        cell.innerHTML = '<i class="fas fa-gem"></i>';
-        revealedCount++;
-        potentialWin += (10 * revealedCount);
-
-        document.getElementById('potential-win').innerText = `+${potentialWin}`;
-        document.getElementById('cashout-btn').style.display = 'block';
-
-        if (revealedCount === 22) cashoutGame(); // Win All
+            alert("💎 ¡PARTIDA PERFECTA! Has ganado 1 Diamante Rojo.");
+            
+            if (state.redDiamonds >= 10) {
+                victoryRedDiamonds();
+            } else {
+                // Volver al setup para el siguiente intento
+                document.getElementById('setup-view').style.display = 'block';
+                document.getElementById('game-view').style.display = 'none';
+                
+                // Actualizar puntitos rojos visuales
+                const redContainer = document.querySelector('.red-diamond-counter');
+                if (redContainer) {
+                    redContainer.innerHTML = Array(10).fill(0).map((_, i) => `<div class="red-dot ${i < state.redDiamonds ? 'active' : ''}"></div>`).join('');
+                }
+                const redTxt = document.querySelector('#setup-view p:nth-of-type(2)');
+                if (redTxt) redTxt.innerText = `${state.redDiamonds} / 10 DIAMANTES ROJOS`;
+            }
+        }
     }
 };
 
-window.cashoutGame = async () => {
-    if (!gameActive) return;
-    gameActive = false;
+function victoryRedDiamonds() {
+    const qrData = localStorage.getItem('goopi_win_code_v4') || `GoopiMaster-${Date.now()}`;
+    if (!localStorage.getItem('goopi_win_code_v4')) localStorage.setItem('goopi_win_code_v4', qrData);
+    
+    const text = `🏆 ¡RETO 10/10 COMPLETADO! He conseguido todos los Diamantes Rojos en Goopi App. Código: ${qrData}`;
+    const waUrl = `https://wa.me/593989427123?text=${encodeURIComponent(text)}`;
 
-    state.userPoints += potentialWin;
-    state.dailyAttempts--;
+    const overlay = document.createElement('div');
+    overlay.style = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.95); backdrop-filter: blur(20px);
+        z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 20px; text-align: center; color: white;
+    `;
+    
+    // Generar la URL de la API de QR
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}&color=0-243-255&bgcolor=0-0-0`;
 
-    if (auth && auth.currentUser) {
-        await db.ref('gameStats/' + auth.currentUser.uid).update({
-            points: state.userPoints,
-            attempts: state.dailyAttempts,
-            lastDate: new Date().toLocaleDateString()
-        });
-    }
+    overlay.innerHTML = `
+        <i class="fas fa-crown" style="font-size: 60px; color: #FFD700; margin-bottom: 20px; animation: pulse 2s infinite;"></i>
+        <h1 style="background: -webkit-linear-gradient(45deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; margin-bottom: 10px;">¡GRAND MASTER GOOPI!</h1>
+        <p style="color: #aaa; margin-bottom: 30px; font-size: 14px;">Has conseguido los 10 Diamantes Rojos.</p>
+        
+        <div style="background: rgba(0,243,255,0.1); padding: 25px; border-radius: 20px; border: 2px solid #00f3ff; margin-bottom: 30px; box-shadow: 0 0 30px rgba(0,243,255,0.3);">
+            <img src="${qrImageUrl}" style="width: 200px; height: 200px; border-radius: 10px; margin-bottom: 15px;">
+            <div style="font-family: monospace; letter-spacing: 2px; font-size: 16px; color: #00f3ff; font-weight: bold;">
+                ${qrData.split('-')[1] || qrData}
+            </div>
+            <p style="font-size: 11px; margin-top: 10px; color: white;">Presenta este código en nuestras oficinas para reclamar tu premio.</p>
+        </div>
+        
+        <button onclick="window.open('${waUrl}', '_blank')" style="background: #25D366; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; box-shadow: 0 5px 20px rgba(37, 211, 102, 0.4);">
+            <i class="fab fa-whatsapp" style="font-size: 20px;"></i> ENVIAR A SOPORTE
+        </button>
+        
+        <button onclick="this.closest('div').remove();" style="margin-top: 20px; background: transparent; color: #888; border: none; padding: 10px; font-size: 14px;">CERRAR</button>
+    `;
 
-    alert(`¡FELICIDADES! Has ganado ${potentialWin} puntos.`);
+    document.body.appendChild(overlay);
     closeMinesGame();
-};
+}
 
 function closeMinesGame() {
-    gameActive = false;
-    const overlay = document.getElementById('mines-game-overlay');
-    if (overlay) overlay.remove();
+    const mines = document.getElementById('mines-game-overlay');
+    if (mines) {
+        gameActive = false;
+        mines.classList.remove('active');
+        setTimeout(() => { if (mines.parentNode) mines.remove(); }, 400);
+        if (!window._isHandlingBack) window.history.back();
+    }
+}
+
+function showRechargeMap() {
+    const existing = document.getElementById('recharge-map-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'recharge-map-overlay';
+    // Estilo blindado para móvil con backdrop superior
+    overlay.style = "position:fixed; inset:0; background:#0c0218; z-index:99999; display:flex; flex-direction:column; color:white;";
+    overlay.innerHTML = `
+        <div style="padding: 30px 20px 20px; text-align: center; background: linear-gradient(to bottom, #1a052d, transparent);">
+            <button onclick="this.closest('#recharge-map-overlay').remove()" style="position:absolute; top:30px; right:20px; background:rgba(255,255,255,0.1); border:none; color:white; width:40px; height:40px; border-radius:50%; z-index:100;"><i class="fas fa-times"></i></button>
+            <h2 style="color:var(--accent-orange); font-weight:900; margin:0; font-size: 24px;">PUNTOS DE RECARGA</h2>
+            <p style="color:#aaa; font-size:13px; margin:5px 0 0;">Acércate a un punto naranja para obtener 1000 Pts</p>
+        </div>
+        
+        <div id="map-recharge-container" style="flex:1; width:100%; border-top: 1px solid rgba(255,140,0,0.3); border-bottom: 1px solid rgba(255,140,0,0.3);"></div>
+        
+        <div style="padding: 20px; background: #1a052d; box-shadow: 0 -10px 30px rgba(0,0,0,0.5);">
+            <button id="btn-recharge-verify" onclick="verifyRechargeLocation()" style="width:100%; height:65px; background:linear-gradient(90deg, #ff8c00, #ff0080); border:none; border-radius:20px; color:white; font-weight:900; font-size:16px; text-transform:uppercase; letter-spacing:1px; box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);">
+                ESTOY AQUÍ - RECARGAR 1000 PTOS
+            </button>
+            <div style="display:flex; justify-content:center; gap:20px; margin-top:15px; font-size:12px; color:#555;">
+                <span><i class="fas fa-map-marker-alt" style="color:var(--accent-orange);"></i> Macas, Ecuador</span>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // Inyectar Leaflet dinámicamente si no está
+    if (!window.L) {
+        const link = document.createElement('link');
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => initRechargeMap();
+        document.head.appendChild(script);
+    } else {
+        initRechargeMap();
+    }
+}
+
+function initRechargeMap() {
+    // Coordenadas Macas Central
+    const map = L.map('map-recharge-container', { zoomControl: false }).setView([-2.3087, -78.1174], 15);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const STATIONS = [
+        { name: "Parque Central", coords: [-78.1174, -2.3087] },
+        { name: "Terminal Terrestre", coords: [-78.1210, -2.3121] },
+        { name: "Plaza Tiwintza", coords: [-78.1154, -2.3056] }
+    ];
+
+    const stationIcon = L.divIcon({
+        className: 'custom-recharge-pin-app',
+        html: `<div style="background-image: url('${LOGO_URL}'); background-size: contain; width: 35px; height: 35px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 15px var(--accent-orange); background-color: #0c0218;"></div>`,
+        iconSize: [35, 35],
+        iconAnchor: [17, 17]
+    });
+
+    STATIONS.forEach(s => {
+        L.marker([s.coords[1], s.coords[0]], { icon: stationIcon })
+         .addTo(map)
+         .bindPopup(`<b style="color:#000;">${s.name}</b><br>Punto de Recarga Goopi`);
+    });
+
+    // Marcador de Usuario Activo
+    const userMarker = L.marker([-2.3087, -78.1174], {
+        icon: L.divIcon({
+            className: 'user-location-marker',
+            html: '<div style="width:18px; height:18px; background:#00ceff; border:3px solid white; border-radius:50%; box-shadow:0 0 15px #00ceff; animation: pulse-gps 2s infinite;"></div>',
+            iconSize: [18, 18]
+        })
+    }).addTo(map);
+
+    // Animación para el GPS
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes pulse-gps { 0% { box-shadow: 0 0 0 0 rgba(0,206,255,0.7); } 70% { box-shadow: 0 0 0 15px rgba(0,206,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,206,255,0); } }`;
+    document.head.appendChild(style);
+
+    // Sistema de rastreo real de posición
+    const updatePosition = (lat, lng) => {
+        userMarker.setLatLng([lat, lng]);
+        // map.panTo([lat, lng]); // Opcional: centrar siempre
+    };
+
+    if (window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+        window.Capacitor.Plugins.Geolocation.watchPosition({ enableHighAccuracy: true }, (pos) => {
+            if (pos) updatePosition(pos.coords.latitude, pos.coords.longitude);
+        });
+    } else if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+            updatePosition(pos.coords.latitude, pos.coords.longitude);
+        }, null, { enableHighAccuracy: true });
+    }
+
+    setTimeout(() => { map.invalidateSize(); }, 600);
+}
+
+window.verifyRechargeLocation = async () => {
+    const btn = document.getElementById('btn-recharge-verify');
+    btn.innerText = "VERIFICANDO...";
+    
+    // Función centralizada para aplicar la recarga
+    const applyRecharge = async () => {
+        const today = new Date().toLocaleDateString();
+        const lastRecharge = localStorage.getItem('goopi_last_recharge_date');
+        
+        if (lastRecharge === today) {
+            alert("⚠️ LÍMITE DIARIO ALCANZADO.\nYa realizaste una recarga en un punto naranja el día de hoy. Vuelve mañana para obtener 1000 puntos más.");
+            const overlay = document.getElementById('recharge-map-overlay');
+            if (overlay) overlay.remove();
+            return;
+        }
+
+        state.userPoints += 1000;
+        localStorage.setItem('goopi_last_recharge_date', today);
+        
+        if (auth && auth.currentUser) {
+            await db.ref('gameStats/' + auth.currentUser.uid).update({ 
+                points: state.userPoints,
+                lastDate: today
+            });
+        }
+        alert("✅ ¡RECARGA EXITOSA!\nSe han añadido 1000 puntos (10 nuevas oportunidades) a tu cuenta.");
+        const overlay = document.getElementById('recharge-map-overlay');
+        if (overlay) overlay.remove();
+        
+        // Si hay un botón de inicio en el setup de Mines, habilitarlo
+        const startBtn = document.querySelector('.btn-start');
+        if (startBtn) startBtn.disabled = false;
+        const setupPts = document.querySelector('#setup-view .stat-box b');
+        if (setupPts) setupPts.innerText = state.userPoints;
+    };
+
+    // Caso Native (Capacitor)
+    if (window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+        try {
+            const pos = await window.Capacitor.Plugins.Geolocation.getCurrentPosition();
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            
+            const stations = [[-2.3087, -78.1174], [-2.3121, -78.1210], [-2.3056, -78.1154]];
+            let near = false;
+            stations.forEach(s => {
+                const d = calculateDistance(lat, lng, s[0], s[1]);
+                if (d < 250) near = true;
+            });
+
+            if (near) {
+                await applyRecharge();
+            } else {
+                alert("❌ No estás en un punto de recarga.\nDebes estar físicamente en uno de los puntos marcados en el mapa.");
+            }
+        } catch (e) { alert("Error de GPS: " + e.message); }
+    } 
+    // Caso Web / Fallback
+    else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const stations = [[-2.3087, -78.1174], [-2.3121, -78.1210], [-2.3056, -78.1154]];
+            let near = false;
+            stations.forEach(s => {
+                const d = calculateDistance(lat, lng, s[0], s[1]);
+                if (d < 250) near = true;
+            });
+
+            if (near) {
+                await applyRecharge();
+            } else {
+                alert("❌ No estás en un punto de recarga.\nDebes estar físicamente en uno de los puntos marcados en el mapa.");
+            }
+        }, () => alert("Por favor, permite el acceso a tu ubicación."));
+    } else {
+        alert("Tu dispositivo no soporta geolocalización.");
+    }
+
+    btn.innerText = "ESTOY AQUÍ - RECARGAR 1000 PUNTOS";
+};
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2-lat1)*Math.PI/180;
+    const dLon = (lon2-lon1)*Math.PI/180;
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 async function deletePost(postId, mediaUrl) {
@@ -1887,10 +2922,110 @@ async function deletePost(postId, mediaUrl) {
     }
 }
 
-// --- BOOTSTRAP (v38.0) ---
+function viewChat(otherId, otherName, otherPhoto) {
+    if (!auth.currentUser) return navigate('login');
+    navigate('chat', { otherId, otherName, otherPhoto });
+}
+
+function syncChatMessages(otherId) {
+    if (!db || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const chatId = uid < otherId ? `${uid}_${otherId}` : `${otherId}_${uid}`;
+    
+    // Cleanup previous listener if any
+    if (window._currentChatRef) window._currentChatRef.off();
+
+    const chatRef = db.ref('messages/' + chatId).limitToLast(50);
+    window._currentChatRef = chatRef;
+
+    chatRef.on('value', (snapshot) => {
+        const messages = [];
+        snapshot.forEach(child => {
+            messages.push({ id: child.key, ...child.val() });
+        });
+        state.activeChatMessages = messages;
+        renderChatMessages();
+    });
+}
+
+function renderChatMessages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    if (state.activeChatMessages.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:50px 20px; color:var(--text-dim); opacity:0.5;"><i class="far fa-comment-dots" style="font-size:30px; margin-bottom:10px;"></i><br>Dí hola...</div>';
+        return;
+    }
+
+    container.innerHTML = state.activeChatMessages.map(msg => `
+        <div class="message-bubble ${msg.senderId === auth.currentUser.uid ? 'sent' : 'received'}">
+            ${msg.text}
+            <span class="message-time">${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+    `).join('');
+    
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendMessage(otherId, otherName, otherPhoto) {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text || !auth.currentUser) return;
+
+    const uid = auth.currentUser.uid;
+    const myName = auth.currentUser.displayName || 'Gooper';
+    const myPhoto = auth.currentUser.photoURL || '';
+    const chatId = uid < otherId ? `${uid}_${otherId}` : `${otherId}_${uid}`;
+    const timestamp = Date.now();
+
+    input.value = '';
+
+    try {
+        const newMessage = {
+            senderId: uid,
+            text,
+            timestamp
+        };
+
+        // 1. Push message
+        await db.ref('messages/' + chatId).push(newMessage);
+
+        // 2. Update summary for ME
+        await db.ref(`userChats/${uid}/${otherId}`).set({
+            otherName,
+            otherPhoto,
+            lastMessage: text,
+            lastTimestamp: timestamp,
+            unread: 0
+        });
+
+        // 3. Update summary for OTHER (Using a direct update to avoid READ permission errors)
+        const otherChatRef = db.ref(`userChats/${otherId}/${uid}`);
+        await otherChatRef.update({
+            otherName: myName,
+            otherPhoto: myPhoto,
+            lastMessage: text,
+            lastTimestamp: timestamp
+            // Note: We don't increment unread here to avoid reading other user's data
+        });
+
+    } catch (e) {
+        console.error("Error sending message:", e);
+        // We only alert if it's a real failure. If the message was pushed, we don't bother the user.
+    }
+}
+
+// --- BOOTSTRAP (v40.0) ---
 initFirebase();
 initCommunity();
-navigate('home');
+const urlParams = new URLSearchParams(window.location.search);
+const startPost = urlParams.get('post');
+if (startPost) {
+    focusOnPost(startPost);
+} else {
+    navigate('home');
+}
 checkDynamicPopup();
 
 // Mostrar Juego de Minas si hay intentos y está logueado
@@ -1898,17 +3033,318 @@ checkDynamicPopup();
 // Solo se accede a él haciendo clic en el botón de 'Puntos Gooper' en el perfil o sección correspondiente.
 // El temporizador de 10s se ha eliminado.
 
-// Capacitor Back Button Integration
+
+// --- INTEGRACIÓN NATIVA CAPACITOR (ANTIGRAVITY v48.2) ---
 if (window.Capacitor) {
     const { App } = window.Capacitor.Plugins;
-    App.addListener('backButton', () => {
-        handleBackButton();
+    if (App) {
+        App.addListener('backButton', () => {
+            console.log("📍 Native Back Button");
+            handleBackButton(false);
+        });
+    }
+}
+
+// Browser/PWA Back Button integration
+window.addEventListener('popstate', (event) => {
+    window._isHandlingPopState = true;
+    const s = event.state;
+    
+    if (s && s.view) {
+        console.log("📍 PopState:", s.view);
+        const oldView = state.currentView;
+        state.currentView = s.view;
+        
+        // --- ACTUALIZACIÓN DE LAYOUT (Sincronización con navigate) ---
+        const isFullScreen = ['taxi', 'delivery', 'community', 'reels-map', 'driver-panel', 'chat'].includes(s.view);
+        const header = document.querySelector('.app-header');
+        const nav = document.querySelector('.bottom-nav');
+        const mainContent = document.getElementById('main-view');
+
+        if (header) header.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
+        if (nav) nav.style.setProperty('display', isFullScreen ? 'none' : 'flex', 'important');
+
+        if (isFullScreen) {
+            mainContent.style.padding = '0';
+            mainContent.style.height = '100vh';
+            mainContent.style.position = 'fixed';
+            mainContent.style.zIndex = (s.view === 'chat') ? '20000' : '1000';
+            mainContent.style.overflow = 'hidden';
+            mainContent.style.background = '#000';
+        } else {
+            mainContent.style.padding = '20px 20px 140px';
+            mainContent.style.height = 'auto';
+            mainContent.style.position = 'static';
+            mainContent.style.zIndex = '1';
+            mainContent.style.overflowY = 'auto';
+            mainContent.style.background = 'transparent';
+        }
+        
+        // Hide ALL overlays visually
+        document.querySelectorAll('.details-overlay, .popup-overlay, #search-overlay, .mines-overlay, .comment-sheet, .likes-sheet, .share-sheet').forEach(el => {
+            el.classList.remove('active');
+            if (el.id === 'mines-game-overlay' || el.classList.contains('comment-sheet') || el.classList.contains('likes-sheet') || el.classList.contains('share-sheet')) {
+                setTimeout(() => { if (el.parentNode) el.remove(); }, 400);
+            }
+        });
+        
+        if (s.view !== oldView) {
+            renderView(s.view, mainContent, s.extra);
+        } else if (s.view === 'community' || s.view === 'reels-map') {
+            // Regresamos de un overlay en comunidad, mantener scroll y videos
+            const bNav = document.querySelector('.bottom-nav');
+            if (bNav) bNav.style.setProperty('display', 'none', 'important');
+        }
+        
+        // UI Update (Icons)
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('data-view') === s.view);
+        });
+    }
+    
+    setTimeout(() => { window._isHandlingPopState = false; }, 100);
+});
+
+async function initReelsMap() {
+    // Inyectar Leaflet si falta
+    if (!window.L) {
+        const link = document.createElement('link');
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        document.head.appendChild(script);
+        await new Promise(r => script.onload = r);
+    }
+
+    const map = L.map('reels-leaflet-map', { zoomControl: false }).setView([-2.3087, -78.1174], 14);
+    // SIMULACIÓN: Si no hay posts con GPS, asignamos coordenadas aleatorias en Macas
+    // a los últimos reels para que puedas ver cómo funciona de inmediato.
+    const postsWithLocation = state.communityPosts.filter(p => p.lat && p.lng && p.lat !== 0);
+    
+    const displayPosts = postsWithLocation.length > 0 ? postsWithLocation : state.communityPosts.slice(0, 5).map((p, i) => {
+        return {
+            ...p,
+            lat: -2.3087 + (Math.random() - 0.5) * 0.02,
+            lng: -78.1174 + (Math.random() - 0.5) * 0.02
+        };
     });
+
+    // Estilo Oscuro Premium
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; Goopi App'
+    }).addTo(map);
+
+    displayPosts.forEach(post => {
+        const iconHtml = `
+            <div class="reel-marker-anim" style="width: 60px; height: 60px; background: white; padding: 4px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transform: rotate(${Math.random() * 10 - 5}deg); position: relative;">
+                <div style="width: 100%; height: 100%; border-radius: 4px; overflow: hidden; background: #000; position: relative;">
+                    ${post.mediaType === 'video' 
+                        ? `<video src="${post.mediaUrl}#t=0.5" autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover;"></video>`
+                        : `<img src="${post.mediaUrl}" style="width:100%; height:100%; object-fit:cover;">`}
+                </div>
+                <!-- Pequeño icono de play si es video -->
+                ${post.mediaType === 'video' ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 14px; opacity: 0.8; text-shadow: 0 0 10px rgba(0,0,0,0.5); pointer-events: none;"><i class="fas fa-play"></i></div>` : ''}
+                
+                <!-- Borde inferior neón Goopi -->
+                <div style="position: absolute; bottom: -2px; left: 10px; right: 10px; height: 4px; background: var(--secondary-lilac); border-radius: 10px; box-shadow: 0 0 10px var(--secondary-lilac);"></div>
+            </div>
+        `;
+
+        const markerIcon = L.divIcon({
+            html: iconHtml,
+            className: 'reels-custom-icon',
+            iconSize: [60, 60],
+            iconAnchor: [30, 30]
+        });
+
+        const marker = L.marker([post.lat, post.lng], { icon: markerIcon }).addTo(map);
+        
+        marker.on('click', () => {
+            focusOnPost(post.id);
+        });
+    });
+
+    // Zoom a la ubicación del usuario si está disponible
+    try {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                L.circle([pos.coords.latitude, pos.coords.longitude], {
+                    color: '#00f3ff',
+                    fillColor: '#00f3ff',
+                    fillOpacity: 0.2,
+                    radius: 100
+                }).addTo(map);
+            });
+        }
+    } catch(e) {}
+}
+
+
+// --- FARMACIAS DE TURNO (Funcionalidad Local Macas) ---
+// --- FARMACIAS DE TURNO (Funcionalidad Local Macas) ---
+// --- FARMACIAS DE TURNO (Funcionalidad Dinámica Multi-Ciudad) ---
+async function showFarmaciasTurno() {
+    const overlay = document.createElement('div');
+    overlay.id = 'farmacias-overlay';
+    overlay.className = 'reward-overlay active';
+    overlay.style.zIndex = "100000";
+    
+    // UI de Carga Inicial
+    overlay.innerHTML = `
+        <div class="reward-content" style="background: linear-gradient(135deg, #050510 0%, #1a0b2e 100%); border: 1px solid #00f3ff; width: 90%; max-width: 400px; padding: 40px 25px; border-radius: 30px;">
+            <div style="font-size: 40px; color: #00f3ff; margin-bottom: 15px; filter: drop-shadow(0 0 10px #00f3ff);">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <h2 style="color: white; font-size: 22px; margin-bottom: 5px; font-weight: 900;">LOCALIZANDO...</h2>
+            <p style="color: var(--text-dim); font-size: 12px;">Buscando farmacias cerca de ti</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Default to Macas
+    let cityNode = 'macas';
+    let cityName = 'Macas';
+
+    // Función auxiliar para determinar ciudad por coordenadas
+    const detectCity = (lat, lng) => {
+        // Coordenadas aproximadas
+        const distMacas = calculateDistance(lat, lng, -2.308, -78.118);
+        const distSucua = calculateDistance(lat, lng, -2.458, -78.172);
+        
+        if (distSucua < 10000) { // Si está a menos de 10km de Sucúa
+            return { node: 'sucua', name: 'Sucúa' };
+        }
+        return { node: 'macas', name: 'Macas' };
+    };
+
+    try {
+        // Intentar obtener ubicación del usuario
+        if (window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+            try {
+                const pos = await window.Capacitor.Plugins.Geolocation.getCurrentPosition({ timeout: 5000 });
+                const loc = detectCity(pos.coords.latitude, pos.coords.longitude);
+                cityNode = loc.node;
+                cityName = loc.name;
+            } catch(e) { console.log('GPS nativo falló, usando Macas por defecto'); }
+        } else if (navigator.geolocation) {
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                });
+                const loc = detectCity(pos.coords.latitude, pos.coords.longitude);
+                cityNode = loc.node;
+                cityName = loc.name;
+            } catch(e) { console.log('GPS web falló, usando Macas por defecto'); }
+        }
+
+        const snapshot = await db.ref(`farmacias_turno/${cityNode}`).once('value');
+        let farmacias = [];
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            if (Array.isArray(data)) {
+                farmacias = data.filter(item => item !== null);
+            } else {
+                farmacias = Object.values(data);
+            }
+        } else {
+            // Datos de respaldo para Macas
+            if (cityNode === 'macas') {
+                farmacias = [
+                    { nombre: "Farmacia Cruz Azul", direccion: "Calle 10 de Agosto y Amazonas", lat: -2.308, lng: -78.118 },
+                    { nombre: "Farmacia Sana Sana", direccion: "Av. 29 de Mayo (Cerca al Terminal)", lat: -2.315, lng: -78.125 }
+                ];
+                await db.ref('farmacias_turno/macas').set(farmacias);
+            }
+        }
+
+        if (farmacias.length === 0) {
+            overlay.innerHTML = `
+                <div class="reward-content" style="background: linear-gradient(135deg, #050510 0%, #1a0b2e 100%); border: 1px solid #00f3ff; width: 90%; max-width: 400px; padding: 25px; border-radius: 30px;">
+                    <div style="font-size: 40px; color: #ff8c00; margin-bottom: 15px;">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <h2 style="color: white; font-size: 22px; margin-bottom: 5px; font-weight: 900;">NO HAY DATOS</h2>
+                    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">No se encontraron farmacias de turno para <b>${cityName}</b> en este momento.</p>
+                    <button class="reward-btn" onclick="document.getElementById('farmacias-overlay').remove()" style="background: rgba(255,255,255,0.1); width: 100%;">VOLVER</button>
+                </div>
+            `;
+            return;
+        }
+
+        let htmlList = farmacias.map(f => `
+            <div class="pharmacy-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <h4 style="color: #00f3ff; margin: 0; font-size: 16px; font-weight: 800;">${f.nombre}</h4>
+                        <p style="color: #ccc; font-size: 11px; margin-top: 4px; line-height: 1.3;"><i class="fas fa-map-marker-alt" style="font-size: 10px; color: #ff8c00;"></i> ${f.direccion}</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                    <button onclick="document.getElementById('farmacias-overlay').remove(); navigate('taxi', {lat: ${f.lat || -2.308}, lng: ${f.lng || -78.117}})" style="background: linear-gradient(90deg, #ff8c00, #ff5e00); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase;">
+                        <i class="fas fa-taxi"></i> IR ALLÁ
+                    </button>
+                    ${f.telefono ? 
+                    `<button onclick="window.open('tel:${f.telefono}')" style="background: linear-gradient(90deg, #25D366, #128C7E); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase;">
+                        <i class="fas fa-phone"></i> LLAMAR
+                    </button>` : 
+                    `<button onclick="document.getElementById('farmacias-overlay').remove(); navigate('delivery')" style="background: linear-gradient(90deg, var(--secondary-lilac), #8c309b); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase;">
+                        <i class="fas fa-motorcycle"></i> PEDIR
+                    </button>`}
+                </div>
+            </div>
+        `).join('');
+
+        overlay.innerHTML = `
+            <style>
+                .pharmacy-card {
+                    background: rgba(255,255,255,0.05); 
+                    border: 1px solid rgba(0,243,255,0.2); 
+                    padding: 15px; 
+                    border-radius: 18px;
+                    margin-bottom: 12px;
+                    transition: transform 0.2s;
+                }
+                .pharmacy-card:active { transform: scale(0.98); }
+            </style>
+            <div class="reward-content" style="background: linear-gradient(135deg, #050510 0%, #1a0b2e 100%); border: 1px solid #00f3ff; width: 90%; max-width: 400px; padding: 25px; border-radius: 30px;">
+                <div style="font-size: 40px; color: #00f3ff; margin-bottom: 15px; filter: drop-shadow(0 0 10px #00f3ff);">
+                    <i class="fas fa-clinic-medical"></i>
+                </div>
+                <h2 style="color: white; font-size: 22px; margin-bottom: 5px; font-weight: 900;">FARMACIAS DE TURNO</h2>
+                <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 20px;">Hoy en ${cityName}, Morona Santiago</p>
+                
+                <div style="text-align: left; display: flex; flex-direction: column; width: 100%; max-height: 300px; overflow-y: auto; padding-right: 5px;">
+                    ${htmlList}
+                </div>
+
+                <button class="reward-btn" onclick="document.getElementById('farmacias-overlay').remove()" style="background: rgba(255,255,255,0.1); margin-top: 20px; font-size: 13px; border: 1px solid rgba(255,255,255,0.1); width: 100%;">VOLVER AL INICIO</button>
+            </div>
+        `;
+    } catch (e) {
+        console.error("Error al cargar farmacias", e);
+        overlay.innerHTML = `
+            <div class="reward-content" style="background: #1a0b2e; padding: 20px; border-radius: 20px;">
+                <p style="color:#ff2d55; font-weight: 800;">Error de conexión.</p>
+                <p style="color:white; font-size:12px; margin-bottom:15px;">No se pudo verificar el turno con el servidor.</p>
+                <button onclick="document.getElementById('farmacias-overlay').remove()" style="background:white; color:black; border:none; padding:10px 20px; border-radius:10px; font-weight:800;">Cerrar</button>
+            </div>
+        `;
+    }
+
+    if (!window._isHandlingBack) window.history.pushState({ overlay: 'farmacias' }, "");
+}
+
+// Inicialización de historial limpio
+if (!window.history.state) {
+    window.history.replaceState({ view: 'home' }, 'home', "");
 }
 
 // PWA Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=38.0');
+        navigator.serviceWorker.register('./sw.js?v=40.0');
     });
 }
